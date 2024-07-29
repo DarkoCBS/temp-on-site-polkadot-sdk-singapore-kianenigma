@@ -18,7 +18,7 @@ mod benchmarking;
 pub mod pallet {
 	use crate::AssetPriceLookup;
 	use frame_support::sp_runtime::traits::AccountIdConversion;
-	use frame_support::traits::tokens::Preservation;
+	use frame_support::traits::tokens::{AssetId, Preservation};
 	use frame_support::PalletId;
 	use frame_support::{
 		pallet_prelude::*,
@@ -76,6 +76,8 @@ pub mod pallet {
 			+ fungibles::Mutate<Self::AccountId>
 			+ fungibles::Create<Self::AccountId>;
 
+		const NATIVE_ASSET_ID: AssetIdOf<Self>;
+
 		// two ways to convert asset and balance type to one another, look into `ConvertBack` for
 		// reverse conversion, or define a second type.
 		// type AssetIdToBalance: Convert<AssetBalanceOf<Self>, BalanceOf<Self>>;
@@ -113,6 +115,7 @@ pub mod pallet {
 		beneficiary: T::AccountId,
 		#[codec(compact)]
 		amount: BalanceOf<T>,
+		asset_id: AssetIdOf<T>,
 		spender_type: Origin,
 		approved: bool,
 	}
@@ -215,7 +218,6 @@ pub mod pallet {
 			index: u16,
 		) -> DispatchResult {
 			let _who = T::TreasuryOrigin::ensure_origin(origin)?;
-		
 			SpendingProposals::<T>::try_mutate(&proposer, index, |proposal| {
 				match proposal {
 					Some(p) => {
@@ -223,6 +225,11 @@ pub mod pallet {
 							return Err("Proposal already approved");
 						}
 						p.approved = true;
+						if p.asset_id == T::NATIVE_ASSET_ID {
+							Self::send_native_funds_to_beneficiary(p.beneficiary.clone(), p.amount)?;
+						} else {
+							Self::send_asset_funds_to_beneficiary(p.beneficiary.clone(), p.amount, p.asset_id.clone())?;
+						}
 						Ok(())
 					},
 					None => Err("Proposal does not exist"),
@@ -353,7 +360,7 @@ pub mod pallet {
 			// pallet logic into different files, with better, more clear structure, rather
 			// than having a single huge complicated file.
 
-			let price_in_usd = T::AssetPriceLookup::usd_price(asset_id, amount);
+			let price_in_usd = T::AssetPriceLookup::usd_price(&asset_id, amount);
 
 			// Determine the spender type based on the amount
 			let spender_type = if price_in_usd <= T::SmallSpenderThreshold::get() {
@@ -372,6 +379,7 @@ pub mod pallet {
 				proposer: proposer.clone(),
 				beneficiary,
 				amount,
+				asset_id,
 				spender_type,
 				approved: false,
 			};
@@ -393,5 +401,5 @@ pub trait AssetPriceLookup<T: Config> {
 		asset_b_id: AssetIdOf<T>,
 	) -> AssetBalanceOf<T>;
 
-	fn usd_price(asset_id: AssetIdOf<T>, amount: AssetBalanceOf<T>) -> AssetBalanceOf<T>;
+	fn usd_price(asset_id: &AssetIdOf<T>, amount: AssetBalanceOf<T>) -> AssetBalanceOf<T>;
 }
