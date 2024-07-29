@@ -18,7 +18,7 @@ mod benchmarking;
 pub mod pallet {
 	use crate::AssetPriceLookup;
 	use frame_support::sp_runtime::traits::AccountIdConversion;
-	use frame_support::traits::tokens::{AssetId, Preservation};
+	use frame_support::traits::tokens::Preservation;
 	use frame_support::PalletId;
 	use frame_support::{
 		pallet_prelude::*,
@@ -88,7 +88,7 @@ pub mod pallet {
 		// A custom, configurable origin that you can use. It can be wired to be `EnsureSigned`,
 		// `EnsureRoot`, or any custom implementation at the runtime level.
 		// https://paritytech.github.io/polkadot-sdk/master/polkadot_sdk_docs/reference_docs/frame_origin/index.html#asserting-on-a-custom-external-origin
-		type TreasuryOrigin: EnsureOrigin<Self::RuntimeOrigin>;
+		type GovernanceOrigin: EnsureOrigin<Self::RuntimeOrigin>;
 
 		// Here is an associated type to give you access to your simple asset price lookup function
 		type AssetPriceLookup: crate::AssetPriceLookup<Self>;
@@ -102,9 +102,19 @@ pub mod pallet {
 		type MediumSpenderThreshold: Get<BalanceOf<Self>>;
 	}
 
-	/// The pallet's storage items.
-	/// https://paritytech.github.io/polkadot-sdk/master/polkadot_sdk_docs/guides/your_first_pallet/index.html#storage
-	/// https://paritytech.github.io/polkadot-sdk/master/frame_support/pallet_macros/attr.storage.html
+	
+	#[derive(TypeInfo, Encode, Decode, MaxEncodedLen, Debug, Clone, PartialEq)]
+	pub struct PeriodicPayout {
+		upfront: u16,
+		rest_over_n_blocks: u16,
+		after_fully_complete: u16,
+	}
+
+	#[derive(TypeInfo, Encode, Decode, MaxEncodedLen, Debug, Clone, PartialEq)]
+	pub enum PayoutType {
+		Periodic(PeriodicPayout),
+		Instant,
+	}
 
 	#[derive(TypeInfo, Encode, Decode, MaxEncodedLen)]
 	#[scale_info(skip_type_params(T))]
@@ -117,9 +127,13 @@ pub mod pallet {
 		amount: BalanceOf<T>,
 		asset_id: AssetIdOf<T>,
 		spender_type: Origin,
+		payout_type: PayoutType,
 		approved: bool,
 	}
 
+	/// The pallet's storage items.
+	/// https://paritytech.github.io/polkadot-sdk/master/polkadot_sdk_docs/guides/your_first_pallet/index.html#storage
+	/// https://paritytech.github.io/polkadot-sdk/master/frame_support/pallet_macros/attr.storage.html
 	#[pallet::storage]
 	pub type SpendingProposals<T: Config> =
 		StorageDoubleMap<_, Twox64Concat, T::AccountId, Twox64Concat, u16, SpendingProposal<T>>;
@@ -135,7 +149,6 @@ pub mod pallet {
 	#[pallet::genesis_build]
 	impl BuildGenesisConfig for GenesisConfig {
 		fn build(&self) {
-			const PALLET_ID: PalletId = PalletId(*b"treasury");
 			PALLET_ID.try_into_account().expect("Failed to create account ID")
 		}
 	}
@@ -165,19 +178,6 @@ pub mod pallet {
 		/// Errors should have helpful documentation associated with them.
 		StorageOverflow,
 	}
-
-	// Here is an example of explicitly telling SCALE codec to encode a number as compact in
-	// storage.
-	#[derive(TypeInfo, Encode, Decode, MaxEncodedLen)]
-	#[scale_info(skip_type_params(T))]
-	pub struct StoreACompactNumber<T: Config> {
-		who: T::AccountId,
-		#[codec(compact)]
-		amount: BalanceOf<T>,
-	}
-
-	#[pallet::storage]
-	pub type MyCompactNumber<T: Config> = StorageValue<Value = StoreACompactNumber<T>>;
 
 	/// Dispatchable functions allows users to interact with the pallet and invoke state changes.
 	/// These functions materialize as "extrinsics", which are often compared to transactions.
@@ -217,7 +217,7 @@ pub mod pallet {
 			proposer: T::AccountId,
 			index: u16,
 		) -> DispatchResult {
-			let _who = T::TreasuryOrigin::ensure_origin(origin)?;
+			let _who = T::GovernanceOrigin::ensure_origin(origin)?;
 			SpendingProposals::<T>::try_mutate(&proposer, index, |proposal| match proposal {
 				Some(p) => {
 					if p.approved {
@@ -285,9 +285,10 @@ pub mod pallet {
 			amount: BalanceOf<T>,
 			proposer: T::AccountId,
 			beneficiary: T::AccountId,
+			payout_type: PayoutType,
 		) -> DispatchResult {
 			let _anyone = ensure_signed(origin)?;
-			Self::do_propose_spend(title, description, asset_id, amount, proposer, beneficiary)
+			Self::do_propose_spend(title, description, asset_id, amount, proposer, beneficiary, payout_type)
 		}
 
 		// Let's imagine you wanted to build a transfer extrinsic inside your pallet...
@@ -356,6 +357,7 @@ pub mod pallet {
 			amount: BalanceOf<T>,
 			proposer: T::AccountId,
 			beneficiary: T::AccountId,
+			payout_type: PayoutType,
 		) -> DispatchResult {
 			// Write the logic for your extrinsic here, since this is "outside" of the macros.
 			// Following this kind of best practice can even allow you to move most of your
@@ -384,6 +386,7 @@ pub mod pallet {
 				asset_id,
 				spender_type,
 				approved: false,
+				payout_type
 			};
 
 			SpendingProposals::<T>::insert(&proposer, index_count, proposal);
