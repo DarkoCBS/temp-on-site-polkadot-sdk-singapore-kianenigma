@@ -385,6 +385,7 @@ pub mod pallet {
 			};
 
 			SpendingProposals::<T>::insert(&proposer, index_count, proposal);
+			NumOfProposalsFromProposer::<T>::insert(&proposer, index_count + 1);
 			Ok(())
 		}
 	}
