@@ -226,9 +226,9 @@ pub mod pallet {
 						}
 						p.approved = true;
 						if p.asset_id == T::NATIVE_ASSET_ID {
-							Self::send_native_funds_to_beneficiary(p.beneficiary.clone(), p.amount)?;
+							Self::send_native_funds_to_beneficiary(&p.beneficiary, p.amount)?;
 						} else {
-							Self::send_asset_funds_to_beneficiary(p.beneficiary.clone(), p.amount, p.asset_id.clone())?;
+							Self::send_asset_funds_to_beneficiary(&p.beneficiary, p.amount, p.asset_id.clone())?;
 						}
 						Ok(())
 					},
@@ -320,7 +320,7 @@ pub mod pallet {
 		}
 
 		pub fn send_native_funds_to_beneficiary(
-			beneficiary: T::AccountId,
+			beneficiary: &T::AccountId,
 			amount: BalanceOf<T>,
 		) -> DispatchResult {
 			T::NativeBalance::transfer(
@@ -333,7 +333,7 @@ pub mod pallet {
 		}
 
 		pub fn send_asset_funds_to_beneficiary(
-			beneficiary: T::AccountId,
+			beneficiary: &T::AccountId,
 			amount: BalanceOf<T>,
 			asset_id: AssetIdOf<T>,
 		) -> DispatchResult {
