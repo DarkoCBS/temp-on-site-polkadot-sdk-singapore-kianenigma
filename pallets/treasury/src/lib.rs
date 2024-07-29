@@ -218,24 +218,26 @@ pub mod pallet {
 			index: u16,
 		) -> DispatchResult {
 			let _who = T::TreasuryOrigin::ensure_origin(origin)?;
-			SpendingProposals::<T>::try_mutate(&proposer, index, |proposal| {
-				match proposal {
-					Some(p) => {
-						if p.approved {
-							return Err("Proposal already approved");
-						}
-						p.approved = true;
-						if p.asset_id == T::NATIVE_ASSET_ID {
-							Self::send_native_funds_to_beneficiary(&p.beneficiary, p.amount)?;
-						} else {
-							Self::send_asset_funds_to_beneficiary(&p.beneficiary, p.amount, p.asset_id.clone())?;
-						}
-						Ok(())
-					},
-					None => Err("Proposal does not exist"),
-				}
+			SpendingProposals::<T>::try_mutate(&proposer, index, |proposal| match proposal {
+				Some(p) => {
+					if p.approved {
+						return Err("Proposal already approved");
+					}
+					p.approved = true;
+					if p.asset_id == T::NATIVE_ASSET_ID {
+						Self::send_native_funds_to_beneficiary(&p.beneficiary, p.amount)?;
+					} else {
+						Self::send_asset_funds_to_beneficiary(
+							&p.beneficiary,
+							p.amount,
+							p.asset_id.clone(),
+						)?;
+					}
+					Ok(())
+				},
+				None => Err("Proposal does not exist"),
 			})?;
-		
+
 			Ok(())
 		}
 
