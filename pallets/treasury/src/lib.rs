@@ -30,6 +30,7 @@ pub mod pallet {
 		Twox64Concat,
 	};
 	use frame_system::pallet_prelude::{OriginFor, *};
+	use sp_runtime::Percent;
 
 	const PALLET_ID: PalletId = PalletId(*b"treasury");
 
@@ -102,18 +103,39 @@ pub mod pallet {
 		type MediumSpenderThreshold: Get<BalanceOf<Self>>;
 	}
 
-	
 	#[derive(TypeInfo, Encode, Decode, MaxEncodedLen, Debug, Clone, PartialEq)]
-	pub struct PeriodicPayout {
-		upfront: u16,
-		rest_over_n_blocks: u16,
-		after_fully_complete: u16,
+	pub enum NumOfPeriodicPayouts {
+		Five = 5,
+		Ten = 10,
+		Twenty = 20,
+		Fifty = 50,
+	}
+
+	// full amount = upfront + periodic + after_fully_complete
+	#[derive(TypeInfo, Encode, Decode, MaxEncodedLen, Debug, Clone, PartialEq)]
+	pub struct PeriodicPayoutPercentage {
+		upfront: u8,
+		periodic: u8,
+		after_fully_complete: u8,
+		
+		num_of_periodic_payouts: NumOfPeriodicPayouts,
+		payment_each_n_blocks: u32,
 	}
 
 	#[derive(TypeInfo, Encode, Decode, MaxEncodedLen, Debug, Clone, PartialEq)]
 	pub enum PayoutType {
-		Periodic(PeriodicPayout),
+		Periodic(PeriodicPayoutPercentage),
 		Instant,
+	}
+
+	#[derive(TypeInfo, Encode, Decode, MaxEncodedLen, Debug, Clone, PartialEq)]
+	#[scale_info(skip_type_params(T))]
+	pub struct PeriodicPayoutInstance<T: Config> {
+		proposer: T::AccountId,
+		// proposal_index: u16,
+		beneficiary: T::AccountId,
+		asset_id: AssetIdOf<T>,
+		amount: BalanceOf<T>,
 	}
 
 	#[derive(TypeInfo, Encode, Decode, MaxEncodedLen)]
@@ -141,6 +163,10 @@ pub mod pallet {
 	#[pallet::storage]
 	pub type NumOfProposalsFromProposer<T: Config> =
 		StorageMap<_, Twox64Concat, T::AccountId, u16, ValueQuery, GetDefault>;
+
+	#[pallet::storage]
+	pub type PayoutInsances<T: Config> =
+		StorageMap<_, Twox64Concat, BlockNumberFor<T>, Vec<PeriodicPayoutInstance<T>>, ValueQuery>;
 
 	#[pallet::genesis_config]
 	#[derive(frame_support::DefaultNoBound)]
@@ -224,18 +250,10 @@ pub mod pallet {
 						return Err("Proposal already approved");
 					}
 					p.approved = true;
-					if p.asset_id == T::NATIVE_ASSET_ID {
-						Self::send_native_funds_to_beneficiary(&p.beneficiary, p.amount)?;
-					} else {
-						Self::send_asset_funds_to_beneficiary(
-							&p.beneficiary,
-							p.amount,
-							p.asset_id.clone(),
-						)?;
-					}
-					Ok(())
+					Self::setup_payout_instances(p);
+					return Ok(());
 				},
-				None => Err("Proposal does not exist"),
+				None => return Err("Proposal does not exist"),
 			})?;
 
 			Ok(())
@@ -288,7 +306,15 @@ pub mod pallet {
 			payout_type: PayoutType,
 		) -> DispatchResult {
 			let _anyone = ensure_signed(origin)?;
-			Self::do_propose_spend(title, description, asset_id, amount, proposer, beneficiary, payout_type)
+			Self::do_propose_spend(
+				title,
+				description,
+				asset_id,
+				amount,
+				proposer,
+				beneficiary,
+				payout_type,
+			)
 		}
 
 		// Let's imagine you wanted to build a transfer extrinsic inside your pallet...
@@ -322,6 +348,65 @@ pub mod pallet {
 			PALLET_ID.try_into_account().expect("Failed to create account ID")
 		}
 
+		pub fn setup_payout_instances(proposal: &SpendingProposal<T>) -> DispatchResult {
+			match &proposal.payout_type {
+				PayoutType::Periodic(payout) => {
+					let upfront_amount = Percent::from_percent(payout.upfront) * proposal.amount;
+					let after_fully_complete_amount = Percent::from_percent(payout.after_fully_complete) * proposal.amount;
+					let periodic_amount = Percent::from_percent(payout.periodic) * proposal.amount;
+
+					let number_of_payout_instances = payout.num_of_periodic_payouts.clone() as u8;
+					let payment_each_n_blocks = payout.payment_each_n_blocks;
+					let payout_instance_amount: BalanceOf<T> = Percent::from_percent(100 /  number_of_payout_instances) * periodic_amount;
+
+					// Send upfront amount to beneficiary
+					if proposal.asset_id == T::NATIVE_ASSET_ID {
+						Self::send_native_funds_to_beneficiary(
+							&proposal.beneficiary,
+							upfront_amount,
+						)?;
+					} else {
+						Self::send_asset_funds_to_beneficiary(
+							&proposal.beneficiary,
+							upfront_amount,
+							proposal.asset_id.clone(),
+						)?;
+					}
+
+					// Setup periodic payouts
+					let curr_block_number: BlockNumberFor<T> = <frame_system::Pallet<T>>::block_number();
+					for i in 0..number_of_payout_instances {
+						let block_number: BlockNumberFor<T> = curr_block_number + (i as u32 * payment_each_n_blocks).into();
+						let payout_instance: PeriodicPayoutInstance<T> = PeriodicPayoutInstance {
+							proposer: proposal.proposer.clone(),
+							// proposal_index: proposal.,
+							beneficiary: proposal.beneficiary.clone(),
+							asset_id: proposal.asset_id.clone(),
+							amount: payout_instance_amount,
+						};
+
+						PayoutInsances::append(block_number, payout_instance);
+					}
+				},
+				PayoutType::Instant => {
+					if proposal.asset_id == T::NATIVE_ASSET_ID {
+						Self::send_native_funds_to_beneficiary(
+							&proposal.beneficiary,
+							proposal.amount,
+						)?;
+					} else {
+						Self::send_asset_funds_to_beneficiary(
+							&proposal.beneficiary,
+							proposal.amount,
+							proposal.asset_id.clone(),
+						)?;
+					}
+				},
+			}
+
+			Ok(())
+		}
+
 		pub fn send_native_funds_to_beneficiary(
 			beneficiary: &T::AccountId,
 			amount: BalanceOf<T>,
@@ -350,6 +435,21 @@ pub mod pallet {
 			Ok(())
 		}
 
+		fn check_payout_type(payout_type: &PayoutType) -> DispatchResult {
+			match payout_type {
+				PayoutType::Periodic(payout) => {
+					ensure!(
+						payout.upfront + payout.after_fully_complete + payout.periodic == 100,
+						"Payout percentages must sum to 100"
+					);
+					ensure!(
+						payout.payment_each_n_blocks > 0, "Payment each n blocks must be greater than 0"
+					);
+				},
+				PayoutType::Instant => {},
+			}
+			Ok(())
+		}
 		fn do_propose_spend(
 			title: [u8; 32],
 			description: [u8; 500],
@@ -363,6 +463,8 @@ pub mod pallet {
 			// Following this kind of best practice can even allow you to move most of your
 			// pallet logic into different files, with better, more clear structure, rather
 			// than having a single huge complicated file.
+
+			Self::check_payout_type(&payout_type)?;
 
 			let price_in_usd = T::AssetPriceLookup::usd_price(&asset_id, amount);
 
@@ -386,7 +488,7 @@ pub mod pallet {
 				asset_id,
 				spender_type,
 				approved: false,
-				payout_type
+				payout_type,
 			};
 
 			SpendingProposals::<T>::insert(&proposer, index_count, proposal);
