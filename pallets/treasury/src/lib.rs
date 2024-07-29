@@ -250,7 +250,7 @@ pub mod pallet {
 						return Err("Proposal already approved");
 					}
 					p.approved = true;
-					Self::setup_payout_instances(p);
+					Self::setup_payout_instances(p)?;
 					return Ok(());
 				},
 				None => return Err("Proposal does not exist"),
