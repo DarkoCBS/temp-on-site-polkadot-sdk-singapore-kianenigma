@@ -1,5 +1,6 @@
 use crate::{mock::*, *};
 use frame_support::traits::fungible::Mutate;
+use frame_support::traits::fungible::Inspect;
 use frame_support::{assert_noop, assert_ok, traits::fungibles};
 use sp_io::TestExternalities as TestState;
 
@@ -9,13 +10,17 @@ pub(crate) const CHARLIE: u64 = 3;
 
 pub(crate) struct StateBuilder {
 	balances: Vec<(<Test as frame_system::Config>::AccountId, Balance)>,
+	treasury_account_id: <Test as frame_system::Config>::AccountId,
 }
 
 impl Default for StateBuilder {
 	fn default() -> Self {
+		let treasury_account_id = Treasury::treasury_account_id();
+
 		Self {
+			treasury_account_id,
 			balances: vec![
-				(Treasury::treasury_account_id(), 999_999),
+				(treasury_account_id, 999_999),
 				(ALICE, 100_000),
 				(BOB, 100_000),
 			],
@@ -36,7 +41,7 @@ impl StateBuilder {
 
 		ext.execute_with(test);
 
-		// Assertions that must always hold
+		// Assertions that must always hold (system invariants)
 		ext.execute_with(|| {
 			assert_eq!(true, true);
 		})
@@ -58,6 +63,25 @@ impl StateBuilder {
 		self.balances.push((treasury_account, amount));
 		self
 	}
+}
+
+#[test]
+fn fund_treasury_asset() {
+	StateBuilder::default()
+		.build_and_execute(|| {
+			// Check initial treasury balance
+			let treasury_account = &Treasury::treasury_account_id();
+			assert_eq!(<Test as Config>::NativeBalance::balance(treasury_account), 999_999);
+
+			// Fund Treasury
+			let fund_treasury_amount = 1;
+			assert_ok!(Treasury::fund_treasury_native(RuntimeOrigin::signed(ALICE), fund_treasury_amount)); 
+
+			// Check Treasury balance after funding
+			assert_eq!(<Test as Config>::NativeBalance::balance(treasury_account), 999_999 + fund_treasury_amount);
+			// Check Alice balance after funding
+			assert_eq!(<Test as Config>::NativeBalance::balance(&ALICE), 100_000 - fund_treasury_amount);
+		});
 }
 
 #[test]
