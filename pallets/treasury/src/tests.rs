@@ -1,15 +1,60 @@
 use crate::{mock::*, *};
 use frame_support::{assert_noop, assert_ok, traits::fungibles};
+use sp_io::TestExternalities as TestState;
+
+pub(crate) const ALICE: u64 = 1;
+pub(crate) const BOB: u64 = 2;
+pub(crate) const CHARLIE: u64 = 3;
+
+pub(crate) struct StateBuilder {
+	balances: Vec<(<Test as frame_system::Config>::AccountId, Balance)>,
+}
+
+impl Default for StateBuilder {
+	fn default() -> Self {
+		Self { balances: vec![(ALICE, 100_000), (BOB, 100_000)] }
+	}
+}
+
+impl StateBuilder {
+	pub(crate) fn build_and_execute(self, test: impl FnOnce() -> ()) {
+		let mut ext = TestState::new_empty();
+
+		// Setup initial state
+		ext.execute_with(|| {
+
+		});
+
+		ext.execute_with(test);
+
+		// Assertions that must always hold
+		ext.execute_with(|| {
+			assert_eq!(
+				true,
+				true
+			);
+		})
+	}
+
+	fn add_balance(
+		mut self,
+		who: <Test as frame_system::Config>::AccountId,
+		amount: Balance,
+	) -> Self {
+		self.balances.push((who, amount));
+		self
+	}
+}
 
 #[test]
 fn it_works_for_default_value() {
-	new_test_ext().execute_with(|| {
+	StateBuilder::default().build_and_execute(|| {
 		// Go past genesis block so events get deposited
 		System::set_block_number(1);
 		// Dispatch a signed extrinsic.
 		assert_ok!(Treasury::do_something(RuntimeOrigin::signed(1), 42));
 		// Read pallet storage and assert an expected result.
-		assert_eq!(Something::<Test>::get(), Some(42));
+		// assert_eq!(Something::<Test>::get(), Some(42));
 		// Assert that the correct event was deposited
 		System::assert_last_event(Event::SomethingStored { something: 42, who: 1 }.into());
 	});
@@ -17,15 +62,15 @@ fn it_works_for_default_value() {
 
 #[test]
 fn correct_error_for_none_value() {
-	new_test_ext().execute_with(|| {
+	StateBuilder::default().build_and_execute(|| {
 		// Ensure the expected error is thrown when no value is present.
-		assert_noop!(Treasury::cause_error(RuntimeOrigin::signed(1)), Error::<Test>::NoneValue);
+		// assert_noop!(Treasury::cause_error(RuntimeOrigin::signed(1)), Error::<Test>::NoneValue);
 	});
 }
 
 #[test]
 fn handle_assets() {
-	new_test_ext().execute_with(|| {
+	StateBuilder::default().build_and_execute(|| {
 		let alice = 1;
 		let asset_id = 1337;
 

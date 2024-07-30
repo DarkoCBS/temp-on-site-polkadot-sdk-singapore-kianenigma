@@ -9,9 +9,10 @@ use sp_runtime::{
 	traits::{BlakeTwo256, IdentityLookup},
 	BuildStorage,
 };
+use frame_support::parameter_types;
 
 type Block = frame_system::mocking::MockBlock<Test>;
-type Balance = u128;
+pub type Balance = u128;
 
 // Configure a mock runtime to test the pallet.
 frame_support::construct_runtime!(
@@ -103,19 +104,31 @@ impl crate::AssetPriceLookup<Test> for SimplePriceLookup {
 		// you can write more clever function here for more accurate testing
 		amt_a
 	}
+
+	fn usd_price(asset_id: &crate::AssetIdOf<Test>, amount: crate::AssetBalanceOf<Test>) -> crate::AssetBalanceOf<Test> {
+		amount
+	}
+}
+
+parameter_types! {
+	pub static SmallSpenderThreshold: u32 = 5000;
+	pub static MediumSpenderThreshold: u32 = 20000;
 }
 
 impl pallet_treasury::Config for Test {
 	type RuntimeEvent = RuntimeEvent;
 	type NativeBalance = Balances;
 	type Fungibles = Assets;
-	type CustomOrigin = EnsureRoot<u64>;
+	type GovernanceOrigin = EnsureRoot<u64>;
 	type AssetPriceLookup = SimplePriceLookup;
-	type SmallSpender = EnsureRoot<u64>;
+	const NATIVE_ASSET_ID: crate::AssetIdOf<Self> = 0;
+	type SmallSpenderThreshold = SmallSpenderThreshold;
+	type MediumSpenderThreshold = MediumSpenderThreshold;
 }
 
-pub fn new_test_ext() -> sp_io::TestExternalities {
-	// learn how to improve your test setup:
-	// https://paritytech.github.io/polkadot-sdk/master/polkadot_sdk_docs/guides/your_first_pallet/index.html
-	frame_system::GenesisConfig::<Test>::default().build_storage().unwrap().into()
-}
+// pub fn new_test_ext() -> sp_io::TestExternalities {
+// 	// learn how to improve your test setup:
+// 	// https://paritytech.github.io/polkadot-sdk/master/polkadot_sdk_docs/guides/your_first_pallet/index.html
+// 	// frame_system::GenesisConfig::<Test>::default().build_storage().unwrap().into()
+// 	RuntimeGenesisConfig::default().build_storage().unwrap().into()
+// }

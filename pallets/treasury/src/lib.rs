@@ -174,9 +174,7 @@ pub mod pallet {
 
 	#[pallet::genesis_build]
 	impl BuildGenesisConfig for GenesisConfig {
-		fn build(&self) {
-			PALLET_ID.try_into_account().expect("Failed to create account ID")
-		}
+		fn build(&self) { }
 	}
 
 	/// Errors inform users that something went wrong.
@@ -345,7 +343,7 @@ pub mod pallet {
 	// Compare this to the block above which has `#[pallet::call]` which makes them extrinsics!
 	impl<T: Config> Pallet<T> {
 		pub fn treasury_account_id() -> T::AccountId {
-			PALLET_ID.try_into_account().expect("Failed to create account ID")
+			PALLET_ID.into_account_truncating()
 		}
 
 		pub fn setup_payout_instances(proposal: &SpendingProposal<T>) -> DispatchResult {
