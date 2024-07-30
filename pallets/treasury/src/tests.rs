@@ -3,6 +3,7 @@ use frame_support::traits::fungible::Inspect;
 use frame_support::traits::fungible::Mutate;
 use frame_support::{assert_noop, assert_ok, traits::fungibles};
 use sp_io::TestExternalities as TestState;
+use sp_runtime::BoundedVec;
 
 pub(crate) const ALICE: u64 = 1;
 pub(crate) const BOB: u64 = 2;
@@ -86,6 +87,23 @@ fn fund_treasury_asset() {
 			100_000 - fund_treasury_amount
 		);
 	});
+}
+
+#[test]
+fn propose_spend() {
+	StateBuilder::default().build_and_execute(|| {
+		// Propose spend
+		assert_ok!(Treasury::propose_spend(
+			RuntimeOrigin::signed(ALICE),
+			BoundedVec::truncate_from("Title".as_bytes().into()),
+			BoundedVec::truncate_from("Description".as_bytes().to_vec()),
+			0,
+			123_000,
+			ALICE,
+			ALICE,
+			PayoutType::Instant
+		));
+	})
 }
 
 #[test]

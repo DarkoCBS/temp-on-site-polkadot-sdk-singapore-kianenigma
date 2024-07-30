@@ -141,8 +141,8 @@ pub mod pallet {
 	#[derive(TypeInfo, Encode, Decode, MaxEncodedLen)]
 	#[scale_info(skip_type_params(T))]
 	pub struct SpendingProposal<T: Config> {
-		title: [u8; 32],
-		description: [u8; 500],
+		title: BoundedVec<u8, ConstU32<32>>,
+		description: BoundedVec<u8, ConstU32<500>>,
 		proposer: T::AccountId,
 		beneficiary: T::AccountId,
 		#[codec(compact)]
@@ -189,7 +189,7 @@ pub mod pallet {
 			proposer: T::AccountId,
 			index_count: u16,
 			amount: BalanceOf<T>,
-			title: [u8; 32],
+			title: BoundedVec<u8, ConstU32<32>>,
 		},
 	}
 
@@ -274,8 +274,8 @@ pub mod pallet {
 
 		pub fn propose_spend(
 			origin: OriginFor<T>,
-			title: [u8; 32],
-			description: [u8; 500],
+			title: BoundedVec<u8, ConstU32<32>>,
+			description: BoundedVec<u8, ConstU32<500>>,
 			asset_id: AssetIdOf<T>,
 			amount: BalanceOf<T>,
 			proposer: T::AccountId,
@@ -454,8 +454,8 @@ pub mod pallet {
 			Ok(())
 		}
 		fn do_propose_spend(
-			title: [u8; 32],
-			description: [u8; 500],
+			title: BoundedVec<u8, ConstU32<32>>,
+			description: BoundedVec<u8, ConstU32<500>>,
 			asset_id: AssetIdOf<T>,
 			amount: BalanceOf<T>,
 			proposer: T::AccountId,
