@@ -1,4 +1,5 @@
 use crate as pallet_treasury;
+use frame_support::parameter_types;
 use frame_support::{
 	derive_impl,
 	traits::{AsEnsureOriginWithArg, ConstU128, ConstU16, ConstU32, ConstU64},
@@ -9,7 +10,6 @@ use sp_runtime::{
 	traits::{BlakeTwo256, IdentityLookup},
 	BuildStorage,
 };
-use frame_support::parameter_types;
 
 type Block = frame_system::mocking::MockBlock<Test>;
 pub type Balance = u128;
@@ -105,7 +105,10 @@ impl crate::AssetPriceLookup<Test> for SimplePriceLookup {
 		amt_a
 	}
 
-	fn usd_price(asset_id: &crate::AssetIdOf<Test>, amount: crate::AssetBalanceOf<Test>) -> crate::AssetBalanceOf<Test> {
+	fn usd_price(
+		asset_id: &crate::AssetIdOf<Test>,
+		amount: crate::AssetBalanceOf<Test>,
+	) -> crate::AssetBalanceOf<Test> {
 		amount
 	}
 }

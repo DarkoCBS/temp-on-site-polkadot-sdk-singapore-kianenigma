@@ -1,4 +1,5 @@
 use crate::{mock::*, *};
+use frame_support::traits::fungible::Mutate;
 use frame_support::{assert_noop, assert_ok, traits::fungibles};
 use sp_io::TestExternalities as TestState;
 
@@ -12,7 +13,13 @@ pub(crate) struct StateBuilder {
 
 impl Default for StateBuilder {
 	fn default() -> Self {
-		Self { balances: vec![(ALICE, 100_000), (BOB, 100_000)] }
+		Self {
+			balances: vec![
+				(Treasury::treasury_account_id(), 999_999),
+				(ALICE, 100_000),
+				(BOB, 100_000),
+			],
+		}
 	}
 }
 
@@ -22,26 +29,33 @@ impl StateBuilder {
 
 		// Setup initial state
 		ext.execute_with(|| {
-
+			for (who, amount) in &self.balances {
+				<Test as Config>::NativeBalance::set_balance(who, *amount);
+			}
 		});
 
 		ext.execute_with(test);
 
 		// Assertions that must always hold
 		ext.execute_with(|| {
-			assert_eq!(
-				true,
-				true
-			);
+			assert_eq!(true, true);
 		})
 	}
 
-	fn add_balance(
+	fn add_user_balance(
 		mut self,
 		who: <Test as frame_system::Config>::AccountId,
 		amount: Balance,
 	) -> Self {
 		self.balances.push((who, amount));
+		self
+	}
+
+	fn add_treasury_balance(mut self, amount: Balance) -> Self {
+		let treasury_account = Treasury::treasury_account_id();
+		// println!("Treasury_account: {:?}", treasury_account);
+		// <Test as Config>::NativeBalance::set_balance(treasury_account, amount);
+		self.balances.push((treasury_account, amount));
 		self
 	}
 }

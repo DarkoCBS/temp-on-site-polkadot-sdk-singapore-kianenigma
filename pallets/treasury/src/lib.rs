@@ -117,7 +117,7 @@ pub mod pallet {
 		upfront: u8,
 		periodic: u8,
 		after_fully_complete: u8,
-		
+
 		num_of_periodic_payouts: NumOfPeriodicPayouts,
 		payment_each_n_blocks: u32,
 	}
@@ -174,7 +174,7 @@ pub mod pallet {
 
 	#[pallet::genesis_build]
 	impl BuildGenesisConfig for GenesisConfig {
-		fn build(&self) { }
+		fn build(&self) {}
 	}
 
 	/// Errors inform users that something went wrong.
@@ -350,12 +350,14 @@ pub mod pallet {
 			match &proposal.payout_type {
 				PayoutType::Periodic(payout) => {
 					let upfront_amount = Percent::from_percent(payout.upfront) * proposal.amount;
-					let after_fully_complete_amount = Percent::from_percent(payout.after_fully_complete) * proposal.amount;
+					let after_fully_complete_amount =
+						Percent::from_percent(payout.after_fully_complete) * proposal.amount;
 					let periodic_amount = Percent::from_percent(payout.periodic) * proposal.amount;
 
 					let number_of_payout_instances = payout.num_of_periodic_payouts.clone() as u8;
 					let payment_each_n_blocks = payout.payment_each_n_blocks;
-					let payout_instance_amount: BalanceOf<T> = Percent::from_percent(100 /  number_of_payout_instances) * periodic_amount;
+					let payout_instance_amount: BalanceOf<T> =
+						Percent::from_percent(100 / number_of_payout_instances) * periodic_amount;
 
 					// Send upfront amount to beneficiary
 					if proposal.asset_id == T::NATIVE_ASSET_ID {
@@ -372,9 +374,11 @@ pub mod pallet {
 					}
 
 					// Setup periodic payouts
-					let curr_block_number: BlockNumberFor<T> = <frame_system::Pallet<T>>::block_number();
+					let curr_block_number: BlockNumberFor<T> =
+						<frame_system::Pallet<T>>::block_number();
 					for i in 0..number_of_payout_instances {
-						let block_number: BlockNumberFor<T> = curr_block_number + (i as u32 * payment_each_n_blocks).into();
+						let block_number: BlockNumberFor<T> =
+							curr_block_number + (i as u32 * payment_each_n_blocks).into();
 						let payout_instance: PeriodicPayoutInstance<T> = PeriodicPayoutInstance {
 							proposer: proposal.proposer.clone(),
 							// proposal_index: proposal.,
@@ -441,7 +445,8 @@ pub mod pallet {
 						"Payout percentages must sum to 100"
 					);
 					ensure!(
-						payout.payment_each_n_blocks > 0, "Payment each n blocks must be greater than 0"
+						payout.payment_each_n_blocks > 0,
+						"Payment each n blocks must be greater than 0"
 					);
 				},
 				PayoutType::Instant => {},
