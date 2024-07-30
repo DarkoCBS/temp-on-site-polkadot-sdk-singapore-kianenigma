@@ -236,27 +236,6 @@ pub mod pallet {
 			Ok(())
 		}
 
-		pub fn approve_proposal(
-			origin: OriginFor<T>,
-			proposer: T::AccountId,
-			index: u16,
-		) -> DispatchResult {
-			let _who = T::GovernanceOrigin::ensure_origin(origin)?;
-			SpendingProposals::<T>::try_mutate(&proposer, index, |proposal| match proposal {
-				Some(p) => {
-					if p.approved {
-						return Err("Proposal already approved");
-					}
-					p.approved = true;
-					Self::setup_payout_instances(p)?;
-					return Ok(());
-				},
-				None => return Err("Proposal does not exist"),
-			})?;
-
-			Ok(())
-		}
-
 		/// An example dispatchable that takes a singles value as a parameter, writes the value to
 		/// storage and emits an event. This function must be dispatched by a signed extrinsic.
 		pub fn do_something(origin: OriginFor<T>, something: u32) -> DispatchResult {
@@ -313,6 +292,27 @@ pub mod pallet {
 				beneficiary,
 				payout_type,
 			)
+		}
+
+		pub fn approve_proposal(
+			origin: OriginFor<T>,
+			proposer: T::AccountId,
+			index: u16,
+		) -> DispatchResult {
+			let _who = T::GovernanceOrigin::ensure_origin(origin)?;
+			SpendingProposals::<T>::try_mutate(&proposer, index, |proposal| match proposal {
+				Some(p) => {
+					if p.approved {
+						return Err("Proposal already approved");
+					}
+					p.approved = true;
+					Self::setup_payout_instances(p)?;
+					return Ok(());
+				},
+				None => return Err("Proposal does not exist"),
+			})?;
+
+			Ok(())
 		}
 
 		// Let's imagine you wanted to build a transfer extrinsic inside your pallet...

@@ -1,6 +1,6 @@
 use crate::{mock::*, *};
-use frame_support::traits::fungible::Mutate;
 use frame_support::traits::fungible::Inspect;
+use frame_support::traits::fungible::Mutate;
 use frame_support::{assert_noop, assert_ok, traits::fungibles};
 use sp_io::TestExternalities as TestState;
 
@@ -19,11 +19,7 @@ impl Default for StateBuilder {
 
 		Self {
 			treasury_account_id,
-			balances: vec![
-				(treasury_account_id, 999_999),
-				(ALICE, 100_000),
-				(BOB, 100_000),
-			],
+			balances: vec![(treasury_account_id, 999_999), (ALICE, 100_000), (BOB, 100_000)],
 		}
 	}
 }
@@ -67,21 +63,29 @@ impl StateBuilder {
 
 #[test]
 fn fund_treasury_asset() {
-	StateBuilder::default()
-		.build_and_execute(|| {
-			// Check initial treasury balance
-			let treasury_account = &Treasury::treasury_account_id();
-			assert_eq!(<Test as Config>::NativeBalance::balance(treasury_account), 999_999);
+	StateBuilder::default().build_and_execute(|| {
+		// Check initial treasury balance
+		let treasury_account = &Treasury::treasury_account_id();
+		assert_eq!(<Test as Config>::NativeBalance::balance(treasury_account), 999_999);
 
-			// Fund Treasury
-			let fund_treasury_amount = 1;
-			assert_ok!(Treasury::fund_treasury_native(RuntimeOrigin::signed(ALICE), fund_treasury_amount)); 
+		// Fund Treasury
+		let fund_treasury_amount = 1;
+		assert_ok!(Treasury::fund_treasury_native(
+			RuntimeOrigin::signed(ALICE),
+			fund_treasury_amount
+		));
 
-			// Check Treasury balance after funding
-			assert_eq!(<Test as Config>::NativeBalance::balance(treasury_account), 999_999 + fund_treasury_amount);
-			// Check Alice balance after funding
-			assert_eq!(<Test as Config>::NativeBalance::balance(&ALICE), 100_000 - fund_treasury_amount);
-		});
+		// Check Treasury balance after funding
+		assert_eq!(
+			<Test as Config>::NativeBalance::balance(treasury_account),
+			999_999 + fund_treasury_amount
+		);
+		// Check Alice balance after funding
+		assert_eq!(
+			<Test as Config>::NativeBalance::balance(&ALICE),
+			100_000 - fund_treasury_amount
+		);
+	});
 }
 
 #[test]
