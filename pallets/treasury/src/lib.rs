@@ -49,6 +49,17 @@ pub mod pallet {
 	#[pallet::pallet]
 	pub struct Pallet<T>(_);
 
+	#[pallet::hooks]
+	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
+		fn on_initialize(_n: BlockNumberFor<T>) -> Weight {
+			let payout_instances = PayoutInstances::<T>::get(_n);
+			for payout in payout_instances {
+				Self::exec_payout_instance(payout);
+			};
+			Weight::zero()
+		}
+	}
+
 	#[pallet::origin]
 	#[derive(PartialEq, Eq, Clone, RuntimeDebug, Encode, Decode, TypeInfo, MaxEncodedLen)]
 	pub enum Origin {
@@ -165,7 +176,7 @@ pub mod pallet {
 		StorageMap<_, Twox64Concat, T::AccountId, u16, ValueQuery, GetDefault>;
 
 	#[pallet::storage]
-	pub type PayoutInsances<T: Config> =
+	pub type PayoutInstances<T: Config> =
 		StorageMap<_, Twox64Concat, BlockNumberFor<T>, Vec<PeriodicPayoutInstance<T>>, ValueQuery>;
 
 	#[pallet::genesis_config]
@@ -350,8 +361,9 @@ pub mod pallet {
 			match &proposal.payout_type {
 				PayoutType::Periodic(payout) => {
 					let upfront_amount = Percent::from_percent(payout.upfront) * proposal.amount;
-					let after_fully_complete_amount =
-						Percent::from_percent(payout.after_fully_complete) * proposal.amount;
+					// TODO: Implement after_fully_complete
+					// let after_fully_complete_amount =
+						// Percent::from_percent(payout.after_fully_complete) * proposal.amount;
 					let periodic_amount = Percent::from_percent(payout.periodic) * proposal.amount;
 
 					let number_of_payout_instances = payout.num_of_periodic_payouts.clone() as u8;
@@ -387,7 +399,7 @@ pub mod pallet {
 							amount: payout_instance_amount,
 						};
 
-						PayoutInsances::append(block_number, payout_instance);
+						PayoutInstances::append(block_number, payout_instance);
 					}
 				},
 				PayoutType::Instant => {
@@ -453,6 +465,24 @@ pub mod pallet {
 			}
 			Ok(())
 		}
+
+		fn exec_payout_instance(payout_instance: PeriodicPayoutInstance<T>) -> DispatchResult {
+			if payout_instance.asset_id == T::NATIVE_ASSET_ID {
+				Self::send_native_funds_to_beneficiary(
+					&payout_instance.beneficiary,
+					payout_instance.amount,
+				)?;
+			} else {
+				Self::send_asset_funds_to_beneficiary(
+					&payout_instance.beneficiary,
+					payout_instance.amount,
+					payout_instance.asset_id,
+				)?;
+			}
+			Ok(())
+
+		}
+
 		fn do_propose_spend(
 			title: BoundedVec<u8, ConstU32<32>>,
 			description: BoundedVec<u8, ConstU32<500>>,
