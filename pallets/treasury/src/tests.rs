@@ -1,8 +1,10 @@
 use crate::{mock::*, *};
+use frame_support::assert_err;
 use frame_support::traits::fungible::Inspect;
 use frame_support::traits::fungible::Mutate;
 use frame_support::{assert_noop, assert_ok, traits::fungibles};
 use sp_io::TestExternalities as TestState;
+use sp_runtime::traits::BadOrigin;
 use sp_runtime::BoundedVec;
 
 pub(crate) const ALICE: u64 = 1;
@@ -90,7 +92,30 @@ fn fund_treasury_asset() {
 }
 
 #[test]
-fn propose_spend() {
+fn spending_proposal_instant_payout() {
+	StateBuilder::default().build_and_execute(|| {
+		// Check pre state
+		assert!(SpendingProposals::<Test>::get(ALICE, 0).is_none());
+		
+		// Propose spend
+		assert_ok!(Treasury::propose_spend(
+			RuntimeOrigin::signed(ALICE),
+			BoundedVec::truncate_from("Title".as_bytes().into()),
+			BoundedVec::truncate_from("Description".as_bytes().to_vec()),
+			0,
+			123_000,
+			ALICE,
+			ALICE,
+			PayoutType::Instant
+		));
+
+		// Check post state
+		assert!(SpendingProposals::<Test>::get(ALICE, 0).is_some());
+	})
+}
+
+#[test]
+fn approve_proposal() {
 	StateBuilder::default().build_and_execute(|| {
 		// Propose spend
 		assert_ok!(Treasury::propose_spend(
@@ -103,6 +128,37 @@ fn propose_spend() {
 			ALICE,
 			PayoutType::Instant
 		));
+
+		// Check pre state
+		assert_eq!(SpendingProposals::<Test>::get(ALICE, 0).unwrap().approved, false);
+
+		let governanceOrigin = GovernanceOrigin::get();
+
+		// Approve proposal
+		assert_ok!(Treasury::approve_proposal(RuntimeOrigin::signed(governanceOrigin), ALICE, 0));
+	})
+}
+
+#[test]
+fn approve_proposal_bad_origin() {
+	StateBuilder::default().build_and_execute(|| {
+		// Propose spend
+		assert_ok!(Treasury::propose_spend(
+			RuntimeOrigin::signed(ALICE),
+			BoundedVec::truncate_from("Title".as_bytes().into()),
+			BoundedVec::truncate_from("Description".as_bytes().to_vec()),
+			0,
+			123_000,
+			ALICE,
+			ALICE,
+			PayoutType::Instant
+		));
+
+		// Check pre state
+		assert_eq!(SpendingProposals::<Test>::get(ALICE, 0).unwrap().approved, false);
+
+		// Approve proposal with bad origin raises error
+		assert_err!(Treasury::approve_proposal(RuntimeOrigin::signed(BOB), ALICE, 0), BadOrigin);
 	})
 }
 

@@ -150,7 +150,7 @@ pub mod pallet {
 		asset_id: AssetIdOf<T>,
 		spender_type: Origin,
 		payout_type: PayoutType,
-		approved: bool,
+		pub approved: bool,
 	}
 
 	/// The pallet's storage items.
