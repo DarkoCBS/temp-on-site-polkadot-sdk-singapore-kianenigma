@@ -55,7 +55,7 @@ pub mod pallet {
 			let payout_instances = PayoutInstances::<T>::get(_n);
 			for payout in payout_instances {
 				Self::exec_payout_instance(payout);
-			};
+			}
 			Weight::zero()
 		}
 	}
@@ -125,12 +125,12 @@ pub mod pallet {
 	// full amount = upfront + periodic + after_fully_complete
 	#[derive(TypeInfo, Encode, Decode, MaxEncodedLen, Debug, Clone, PartialEq)]
 	pub struct PeriodicPayoutPercentage {
-		upfront: u8,
-		periodic: u8,
-		after_fully_complete: u8,
+		pub upfront: u8,
+		pub periodic: u8,
+		pub after_fully_complete: u8,
 
-		num_of_periodic_payouts: NumOfPeriodicPayouts,
-		payment_each_n_blocks: u32,
+		pub num_of_periodic_payouts: NumOfPeriodicPayouts,
+		pub payment_each_n_blocks: u32,
 	}
 
 	#[derive(TypeInfo, Encode, Decode, MaxEncodedLen, Debug, Clone, PartialEq)]
@@ -363,7 +363,7 @@ pub mod pallet {
 					let upfront_amount = Percent::from_percent(payout.upfront) * proposal.amount;
 					// TODO: Implement after_fully_complete
 					// let after_fully_complete_amount =
-						// Percent::from_percent(payout.after_fully_complete) * proposal.amount;
+					// Percent::from_percent(payout.after_fully_complete) * proposal.amount;
 					let periodic_amount = Percent::from_percent(payout.periodic) * proposal.amount;
 
 					let number_of_payout_instances = payout.num_of_periodic_payouts.clone() as u8;
@@ -480,7 +480,6 @@ pub mod pallet {
 				)?;
 			}
 			Ok(())
-
 		}
 
 		fn do_propose_spend(

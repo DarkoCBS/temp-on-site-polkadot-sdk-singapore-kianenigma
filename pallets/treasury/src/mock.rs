@@ -1,17 +1,17 @@
 use crate as pallet_treasury;
-use frame_support::{parameter_types, PalletId};
+use frame_support::ord_parameter_types;
 use frame_support::{
 	derive_impl,
 	traits::{AsEnsureOriginWithArg, ConstU128, ConstU16, ConstU32, ConstU64},
 };
+use frame_support::{parameter_types, PalletId};
 use frame_system::{EnsureRoot, EnsureSigned, EnsureSignedBy};
 use sp_core::H256;
+use sp_runtime::traits::AccountIdConversion;
 use sp_runtime::{
 	traits::{BlakeTwo256, IdentityLookup},
 	BuildStorage,
 };
-use frame_support::ord_parameter_types;
-use sp_runtime::traits::AccountIdConversion;
 
 type Block = frame_system::mocking::MockBlock<Test>;
 pub type Balance = u128;
@@ -119,7 +119,7 @@ parameter_types! {
 	pub static SmallSpenderThreshold: u32 = 5000;
 	pub static MediumSpenderThreshold: u32 = 20000;
 	pub static GovernancePalletId: PalletId = PalletId(*b"test/gov");
-}	
+}
 
 ord_parameter_types! {
 	pub const GovernanceOrigin: u64 = AccountIdConversion::<u64>::into_account_truncating(&GovernancePalletId::get());

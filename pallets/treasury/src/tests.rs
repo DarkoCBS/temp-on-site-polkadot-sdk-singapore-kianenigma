@@ -2,6 +2,7 @@ use crate::{mock::*, *};
 use frame_support::assert_err;
 use frame_support::traits::fungible::Inspect;
 use frame_support::traits::fungible::Mutate;
+use frame_support::traits::Hooks;
 use frame_support::{assert_noop, assert_ok, traits::fungibles};
 use sp_io::TestExternalities as TestState;
 use sp_runtime::traits::BadOrigin;
@@ -96,7 +97,7 @@ fn spending_proposal_instant_payout() {
 	StateBuilder::default().build_and_execute(|| {
 		// Check pre state
 		assert!(SpendingProposals::<Test>::get(ALICE, 0).is_none());
-		
+
 		// Propose spend
 		assert_ok!(Treasury::propose_spend(
 			RuntimeOrigin::signed(ALICE),
@@ -115,8 +116,11 @@ fn spending_proposal_instant_payout() {
 }
 
 #[test]
-fn approve_proposal() {
+fn approve_proposal_instant_payout() {
 	StateBuilder::default().build_and_execute(|| {
+		// Check Alice init balance
+		assert_eq!(<Test as Config>::NativeBalance::balance(&ALICE), 100_000);
+
 		// Propose spend
 		assert_ok!(Treasury::propose_spend(
 			RuntimeOrigin::signed(ALICE),
@@ -132,10 +136,67 @@ fn approve_proposal() {
 		// Check pre state
 		assert_eq!(SpendingProposals::<Test>::get(ALICE, 0).unwrap().approved, false);
 
-		let governanceOrigin = GovernanceOrigin::get();
+		let governance_origin = GovernanceOrigin::get();
 
 		// Approve proposal
-		assert_ok!(Treasury::approve_proposal(RuntimeOrigin::signed(governanceOrigin), ALICE, 0));
+		assert_ok!(Treasury::approve_proposal(RuntimeOrigin::signed(governance_origin), ALICE, 0));
+
+		// Check Alice post balance
+		assert_eq!(<Test as Config>::NativeBalance::balance(&ALICE), 223_000);
+	})
+}
+
+#[test]
+fn approve_proposal_periodic_payout() {
+	StateBuilder::default().build_and_execute(|| {
+		// Check alice balance
+		assert_eq!(<Test as Config>::NativeBalance::balance(&ALICE), 100_000);
+
+		let periodic_payout = PayoutType::Periodic(PeriodicPayoutPercentage {
+			upfront: 20,
+			after_fully_complete: 0,
+			periodic: 80,
+			num_of_periodic_payouts: NumOfPeriodicPayouts::Ten,
+			payment_each_n_blocks: 10,
+		});
+
+		// Propose spend
+		assert_ok!(Treasury::propose_spend(
+			RuntimeOrigin::signed(ALICE),
+			BoundedVec::truncate_from("Title".as_bytes().into()),
+			BoundedVec::truncate_from("Description".as_bytes().to_vec()),
+			0,
+			100_000,
+			ALICE,
+			ALICE,
+			periodic_payout
+		));
+
+		// Check if proposal is stored
+		assert_eq!(SpendingProposals::<Test>::get(ALICE, 0).unwrap().approved, false);
+
+		let governance_origin = GovernanceOrigin::get();
+
+		// Approve proposal
+		assert_ok!(Treasury::approve_proposal(RuntimeOrigin::signed(governance_origin), ALICE, 0));
+
+		// Check upfront payment
+		assert_eq!(<Test as Config>::NativeBalance::balance(&ALICE), 120_000);
+
+		for i in (0..100u128).step_by(10) {
+			// Fast forward 10 blocks
+			let block_number: u64 = i.try_into().unwrap();
+			System::set_block_number(block_number);
+			Treasury::on_initialize(block_number);
+
+			// Check periodic payment
+			let payment_instance_counter = i / 10 + 1;
+			let expected_balance = 120_000 + 8_000 * (payment_instance_counter);
+			assert_eq!(<Test as Config>::NativeBalance::balance(&ALICE), expected_balance);
+		}
+
+		// Check Alice balance
+		assert_eq!(<Test as Config>::NativeBalance::balance(&ALICE), 200_000);
 	})
 }
 
