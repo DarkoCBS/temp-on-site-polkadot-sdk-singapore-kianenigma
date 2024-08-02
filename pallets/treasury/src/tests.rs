@@ -110,6 +110,8 @@ fn spending_proposal_instant_payout() {
 			PayoutType::Instant
 		));
 
+		System::assert_last_event(Event::AddedProposal { proposer: ALICE, index_count: 0, amount: 123_000, title: BoundedVec::truncate_from("Title".as_bytes().into()) }.into() );
+
 		// Check post state
 		assert!(SpendingProposals::<Test>::get(ALICE, 0).is_some());
 	})
