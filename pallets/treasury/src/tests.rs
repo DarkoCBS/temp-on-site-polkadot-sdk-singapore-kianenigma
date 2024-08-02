@@ -266,13 +266,13 @@ fn approve_proposal_bad_origin() {
 // 	});
 // }
 
-#[test]
-fn correct_error_for_none_value() {
-	StateBuilder::default().build_and_execute(|| {
-		// Ensure the expected error is thrown when no value is present.
-		// assert_noop!(Treasury::cause_error(RuntimeOrigin::signed(1)), Error::<Test>::NoneValue);
-	});
-}
+// #[test]
+// fn correct_error_for_none_value() {
+// 	StateBuilder::default().build_and_execute(|| {
+// 		// Ensure the expected error is thrown when no value is present.
+// 		// assert_noop!(Treasury::cause_error(RuntimeOrigin::signed(1)), Error::<Test>::NoneValue);
+// 	});
+// }
 
 #[test]
 fn handle_assets() {
