@@ -14,7 +14,6 @@ pub(crate) const CHARLIE: u64 = 3;
 
 pub(crate) struct StateBuilder {
 	balances: Vec<(<Test as frame_system::Config>::AccountId, Balance)>,
-	treasury_account_id: <Test as frame_system::Config>::AccountId,
 }
 
 impl Default for StateBuilder {
@@ -22,7 +21,6 @@ impl Default for StateBuilder {
 		let treasury_account_id = Treasury::treasury_account_id();
 
 		Self {
-			treasury_account_id,
 			balances: vec![(treasury_account_id, 999_999), (ALICE, 100_000), (BOB, 100_000)],
 		}
 	}
@@ -188,7 +186,7 @@ fn approve_proposal_periodic_payout() {
 		let initial_block_number = System::block_number();
 		for i in (0..100u128).step_by(10) {
 			// Fast forward 10 blocks
-			let block_number: u64 = initial_block_number + i as u64;
+			let block_number: u64 =  initial_block_number + i as u64;
 			System::set_block_number(block_number);
 			Treasury::on_initialize(block_number);
 
@@ -204,7 +202,7 @@ fn approve_proposal_periodic_payout() {
 }
 
 #[test]
-fn do_propose_spend_wrong_payout_type() {
+fn do_propose_spend_wrong_payout_type(){
 	StateBuilder::default().build_and_execute(|| {
 		// Check alice balance
 		assert_eq!(<Test as Config>::NativeBalance::balance(&ALICE), 100_000);
@@ -218,19 +216,16 @@ fn do_propose_spend_wrong_payout_type() {
 		});
 
 		// Propose spend
-		assert_err!(
-			Treasury::propose_spend(
-				RuntimeOrigin::signed(ALICE),
-				BoundedVec::truncate_from("Title".as_bytes().into()),
-				BoundedVec::truncate_from("Description".as_bytes().to_vec()),
-				0,
-				100_000,
-				ALICE,
-				ALICE,
-				periodic_payout
-			),
-			Error::<Test>::PayoutPercentagesMustSumTo100
-		);
+		assert_err!(Treasury::propose_spend(
+			RuntimeOrigin::signed(ALICE),
+			BoundedVec::truncate_from("Title".as_bytes().into()),
+			BoundedVec::truncate_from("Description".as_bytes().to_vec()),
+			0,
+			100_000,
+			ALICE,
+			ALICE,
+			periodic_payout
+		), Error::<Test>::PayoutPercentagesMustSumTo100);
 	})
 }
 
@@ -257,19 +252,19 @@ fn approve_proposal_bad_origin() {
 	})
 }
 
-#[test]
-fn it_works_for_default_value() {
-	StateBuilder::default().build_and_execute(|| {
-		// Go past genesis block so events get deposited
-		System::set_block_number(1);
-		// Dispatch a signed extrinsic.
-		assert_ok!(Treasury::do_something(RuntimeOrigin::signed(1), 42));
-		// Read pallet storage and assert an expected result.
-		// assert_eq!(Something::<Test>::get(), Some(42));
-		// Assert that the correct event was deposited
-		System::assert_last_event(Event::SomethingStored { something: 42, who: 1 }.into());
-	});
-}
+// #[test]
+// fn it_works_for_default_value() {
+// 	StateBuilder::default().build_and_execute(|| {
+// 		// Go past genesis block so events get deposited
+// 		System::set_block_number(1);
+// 		// Dispatch a signed extrinsic.
+// 		assert_ok!(Treasury::do_something(RuntimeOrigin::signed(1), 42));
+// 		// Read pallet storage and assert an expected result.
+// 		// assert_eq!(Something::<Test>::get(), Some(42));
+// 		// Assert that the correct event was deposited
+// 		System::assert_last_event(Event::SomethingStored { something: 42, who: 1 }.into());
+// 	});
+// }
 
 #[test]
 fn correct_error_for_none_value() {

@@ -193,8 +193,6 @@ pub mod pallet {
 	#[pallet::event]
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
 	pub enum Event<T: Config> {
-		/// We usually use passive tense for events.
-		SomethingStored { something: u32, who: T::AccountId },
 		// index_count is the number of proposals the proposer has made, starting from 0
 		AddedProposal {
 			proposer: T::AccountId,
@@ -209,6 +207,7 @@ pub mod pallet {
 	#[pallet::error]
 	pub enum Error<T> {
 		PayoutPercentagesMustSumTo100,
+		PaymentEachNBlocksMustBeGreaterThanZero,
 	}
 
 	/// Dispatchable functions allows users to interact with the pallet and invoke state changes.
@@ -246,20 +245,20 @@ pub mod pallet {
 
 		/// An example dispatchable that takes a singles value as a parameter, writes the value to
 		/// storage and emits an event. This function must be dispatched by a signed extrinsic.
-		pub fn do_something(origin: OriginFor<T>, something: u32) -> DispatchResult {
-			// Check that the extrinsic was signed and get the signer.
-			// This function will return an error if the extrinsic is not signed.
-			// // https://paritytech.github.io/polkadot-sdk/master/polkadot_sdk_docs/reference_docs/frame_origin/index.html
-			let who = ensure_signed(origin)?;
+		// pub fn do_something(origin: OriginFor<T>, something: u32) -> DispatchResult {
+		// 	// Check that the extrinsic was signed and get the signer.
+		// 	// This function will return an error if the extrinsic is not signed.
+		// 	// // https://paritytech.github.io/polkadot-sdk/master/polkadot_sdk_docs/reference_docs/frame_origin/index.html
+		// 	let who = ensure_signed(origin)?;
 
-			// Update storage.
-			// <Something<T>>::put(something);
+		// 	// Update storage.
+		// 	// <Something<T>>::put(something);
 
-			// Emit an event.
-			Self::deposit_event(Event::SomethingStored { something, who });
+		// 	// Emit an event.
+		// 	Self::deposit_event(Event::SomethingStored { something, who });
 
-			Ok(())
-		}
+		// 	Ok(())
+		// }
 
 		// /// An example dispatchable that may throw a custom error.
 		// pub fn cause_error(origin: OriginFor<T>) -> DispatchResult {
@@ -327,21 +326,21 @@ pub mod pallet {
 		// This doesn't really make sense to do, since this functionality exists in the `Balances`
 		// pallet, but it illustrates how to use the `BalanceOf<T>` type and the `T::NativeBalance`
 		// api.
-		pub fn my_transfer_function(
-			origin: OriginFor<T>,
-			to: T::AccountId,
-			amount: BalanceOf<T>,
-		) -> DispatchResult {
-			// Probably you would import these at the top of you file, not here, but just trying to
-			// illustrate that you need to import this trait to access the function inside of it.
-			use frame_support::traits::fungible::Mutate;
-			// Read the docs on this to understand what it does...
-			use frame_support::traits::tokens::Preservation;
+		// pub fn my_transfer_function(
+		// 	origin: OriginFor<T>,
+		// 	to: T::AccountId,
+		// 	amount: BalanceOf<T>,
+		// ) -> DispatchResult {
+		// 	// Probably you would import these at the top of you file, not here, but just trying to
+		// 	// illustrate that you need to import this trait to access the function inside of it.
+		// 	use frame_support::traits::fungible::Mutate;
+		// 	// Read the docs on this to understand what it does...
+		// 	use frame_support::traits::tokens::Preservation;
 
-			let sender = ensure_signed(origin)?;
-			T::NativeBalance::transfer(&sender, &to, amount, Preservation::Expendable)?;
-			Ok(())
-		}
+		// 	let sender = ensure_signed(origin)?;
+		// 	T::NativeBalance::transfer(&sender, &to, amount, Preservation::Expendable)?;
+		// 	Ok(())
+		// }
 	}
 
 	// NOTE: This is regular rust, and how you would implement functions onto an object.
@@ -455,7 +454,7 @@ pub mod pallet {
 					);
 					ensure!(
 						payout.payment_each_n_blocks > 0,
-						"Payment each n blocks must be greater than 0"
+						Error::<T>::PaymentEachNBlocksMustBeGreaterThanZero
 					);
 				},
 				PayoutType::Instant => {},
@@ -504,7 +503,7 @@ pub mod pallet {
 			let index_count = NumOfProposalsFromProposer::<T>::get(&proposer);
 
 			let proposal = SpendingProposal {
-				title,
+				title: title.clone(),
 				description,
 				proposer: proposer.clone(),
 				beneficiary,
@@ -517,6 +516,14 @@ pub mod pallet {
 
 			SpendingProposals::<T>::insert(&proposer, index_count, proposal);
 			NumOfProposalsFromProposer::<T>::insert(&proposer, index_count + 1);
+
+			Self::deposit_event(Event::AddedProposal {
+				proposer,
+				index_count,
+				amount,
+				title: title.clone()
+			});
+			
 			Ok(())
 		}
 	}
