@@ -18,7 +18,7 @@ mod benchmarking;
 pub mod pallet {
 	use crate::AssetPriceLookup;
 	use frame_support::sp_runtime::traits::AccountIdConversion;
-	use frame_support::traits::tokens::Preservation;
+	use frame_support::traits::tokens::{Precision, Preservation};
 	use frame_support::PalletId;
 	use frame_support::{
 		pallet_prelude::*,
@@ -34,6 +34,8 @@ pub mod pallet {
 	use frame_support::traits::fungible::MutateHold;
 
 	const PALLET_ID: PalletId = PalletId(*b"treasury");
+
+	
 
 	pub type AssetIdOf<T> = <<T as Config>::Fungibles as fungibles::Inspect<
 		<T as frame_system::Config>::AccountId,
@@ -117,6 +119,8 @@ pub mod pallet {
 		type SmallSpenderThreshold: Get<BalanceOf<Self>>;
 		#[pallet::constant]
 		type MediumSpenderThreshold: Get<BalanceOf<Self>>;
+		#[pallet::constant]
+		type AmountHeldOnProposal: Get<BalanceOf<Self>>;
 	}
 
 	#[derive(TypeInfo, Encode, Decode, MaxEncodedLen, Debug, Clone, PartialEq)]
@@ -332,6 +336,7 @@ pub mod pallet {
 				None => return Err("Proposal does not exist"),
 			})?;
 
+			T::NativeBalance::release(&HoldReason::SpendingProposal.into(), &proposer, T::AmountHeldOnProposal::get(), Precision::BestEffort)?;
 			Ok(())
 		}
 

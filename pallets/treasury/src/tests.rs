@@ -7,6 +7,7 @@ use frame_support::{assert_noop, assert_ok, traits::fungibles};
 use sp_io::TestExternalities as TestState;
 use sp_runtime::traits::BadOrigin;
 use sp_runtime::BoundedVec;
+use crate::tests::AmountHeldOnProposal;
 
 pub(crate) const ALICE: u64 = 1;
 pub(crate) const BOB: u64 = 2;
@@ -146,7 +147,7 @@ fn approve_proposal_instant_payout() {
 		assert_ok!(Treasury::approve_proposal(RuntimeOrigin::signed(governance_origin), ALICE, 0));
 
 		// Check Alice post balance
-		assert_eq!(<Test as Config>::NativeBalance::balance(&ALICE), 223_000 - 100);
+		assert_eq!(<Test as Config>::NativeBalance::balance(&ALICE), 223_000);
 	})
 }
 
@@ -187,7 +188,7 @@ fn approve_proposal_periodic_payout() {
 		assert_ok!(Treasury::approve_proposal(RuntimeOrigin::signed(governance_origin), ALICE, 0));
 
 		// Check upfront payment
-		assert_eq!(<Test as Config>::NativeBalance::balance(&ALICE), 120_000 - 100);
+		assert_eq!(<Test as Config>::NativeBalance::balance(&ALICE), 120_000);
 
 		let initial_block_number = System::block_number();
 		for i in (0..100u128).step_by(10) {
@@ -198,12 +199,12 @@ fn approve_proposal_periodic_payout() {
 
 			// Check periodic payment
 			let payment_instance_counter = i / 10 + 1;
-			let expected_balance = 120_000 + 8_000 * (payment_instance_counter) - 100;
+			let expected_balance = 120_000 + 8_000 * (payment_instance_counter);
 			assert_eq!(<Test as Config>::NativeBalance::balance(&ALICE), expected_balance);
 		}
 
 		// Check Alice balance
-		assert_eq!(<Test as Config>::NativeBalance::balance(&ALICE), 200_000 - 100);
+		assert_eq!(<Test as Config>::NativeBalance::balance(&ALICE), 200_000);
 	})
 }
 
@@ -316,6 +317,6 @@ fn handle_assets() {
 		));
 
 		// And here we can see that alice has this balance.
-		assert_eq!(<Test as Config>::Fungibles::balance(asset_id, &alice), 100);
+		assert_eq!(<Test as Config>::Fungibles::balance(asset_id, &alice), <Test as pallet::Config>::AmountHeldOnProposal::get());
 	});
 }

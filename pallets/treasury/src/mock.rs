@@ -119,6 +119,7 @@ parameter_types! {
 	pub static SmallSpenderThreshold: u32 = 5000;
 	pub static MediumSpenderThreshold: u32 = 20000;
 	pub static GovernancePalletId: PalletId = PalletId(*b"test/gov");
+	pub const AmountHeldOnProposal: u128 = 100;
 }
 
 ord_parameter_types! {
@@ -135,6 +136,7 @@ impl pallet_treasury::Config for Test {
 	type SmallSpenderThreshold = SmallSpenderThreshold;
 	type MediumSpenderThreshold = MediumSpenderThreshold;
 	type RuntimeHoldReason = RuntimeHoldReason;
+	type AmountHeldOnProposal = AmountHeldOnProposal;
 }
 
 // pub fn new_test_ext() -> sp_io::TestExternalities {
