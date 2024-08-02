@@ -37,6 +37,8 @@ impl StateBuilder {
 			for (who, amount) in &self.balances {
 				<Test as Config>::NativeBalance::set_balance(who, *amount);
 			}
+
+			System::set_block_number(1);
 		});
 
 		ext.execute_with(test);
@@ -183,9 +185,10 @@ fn approve_proposal_periodic_payout() {
 		// Check upfront payment
 		assert_eq!(<Test as Config>::NativeBalance::balance(&ALICE), 120_000);
 
+		let initial_block_number = System::block_number();
 		for i in (0..100u128).step_by(10) {
 			// Fast forward 10 blocks
-			let block_number: u64 = i.try_into().unwrap();
+			let block_number: u64 = initial_block_number + i as u64;
 			System::set_block_number(block_number);
 			Treasury::on_initialize(block_number);
 
@@ -197,6 +200,37 @@ fn approve_proposal_periodic_payout() {
 
 		// Check Alice balance
 		assert_eq!(<Test as Config>::NativeBalance::balance(&ALICE), 200_000);
+	})
+}
+
+#[test]
+fn do_propose_spend_wrong_payout_type() {
+	StateBuilder::default().build_and_execute(|| {
+		// Check alice balance
+		assert_eq!(<Test as Config>::NativeBalance::balance(&ALICE), 100_000);
+
+		let periodic_payout = PayoutType::Periodic(PeriodicPayoutPercentage {
+			upfront: 100,
+			after_fully_complete: 0,
+			periodic: 80,
+			num_of_periodic_payouts: NumOfPeriodicPayouts::Ten,
+			payment_each_n_blocks: 10,
+		});
+
+		// Propose spend
+		assert_err!(
+			Treasury::propose_spend(
+				RuntimeOrigin::signed(ALICE),
+				BoundedVec::truncate_from("Title".as_bytes().into()),
+				BoundedVec::truncate_from("Description".as_bytes().to_vec()),
+				0,
+				100_000,
+				ALICE,
+				ALICE,
+				periodic_payout
+			),
+			Error::<Test>::PayoutPercentagesMustSumTo100
+		);
 	})
 }
 

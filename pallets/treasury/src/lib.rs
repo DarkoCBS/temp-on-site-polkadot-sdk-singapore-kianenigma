@@ -208,10 +208,7 @@ pub mod pallet {
 	/// https://paritytech.github.io/polkadot-sdk/master/polkadot_sdk_docs/guides/your_first_pallet/index.html#event-and-error
 	#[pallet::error]
 	pub enum Error<T> {
-		/// Error names should be descriptive.
-		NoneValue,
-		/// Errors should have helpful documentation associated with them.
-		StorageOverflow,
+		PayoutPercentagesMustSumTo100,
 	}
 
 	/// Dispatchable functions allows users to interact with the pallet and invoke state changes.
@@ -454,7 +451,7 @@ pub mod pallet {
 				PayoutType::Periodic(payout) => {
 					ensure!(
 						payout.upfront + payout.after_fully_complete + payout.periodic == 100,
-						"Payout percentages must sum to 100"
+						Error::<T>::PayoutPercentagesMustSumTo100
 					);
 					ensure!(
 						payout.payment_each_n_blocks > 0,
@@ -491,11 +488,6 @@ pub mod pallet {
 			beneficiary: T::AccountId,
 			payout_type: PayoutType,
 		) -> DispatchResult {
-			// Write the logic for your extrinsic here, since this is "outside" of the macros.
-			// Following this kind of best practice can even allow you to move most of your
-			// pallet logic into different files, with better, more clear structure, rather
-			// than having a single huge complicated file.
-
 			Self::check_payout_type(&payout_type)?;
 
 			let price_in_usd = T::AssetPriceLookup::usd_price(&asset_id, amount);
