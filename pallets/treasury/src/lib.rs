@@ -31,6 +31,7 @@ pub mod pallet {
 	};
 	use frame_system::pallet_prelude::{OriginFor, *};
 	use sp_runtime::Percent;
+	use frame_support::traits::fungible::MutateHold;
 
 	const PALLET_ID: PalletId = PalletId(*b"treasury");
 
@@ -79,14 +80,18 @@ pub mod pallet {
 		type NativeBalance: fungible::Inspect<Self::AccountId>
 			+ fungible::Mutate<Self::AccountId>
 			+ fungible::hold::Inspect<Self::AccountId>
-			+ fungible::hold::Mutate<Self::AccountId>
+			+ fungible::hold::Mutate<Self::AccountId, Reason = Self::RuntimeHoldReason>
 			+ fungible::freeze::Inspect<Self::AccountId>
 			+ fungible::freeze::Mutate<Self::AccountId>;
+			
 
 		/// Type to access the Assets Pallet.
 		type Fungibles: fungibles::Inspect<Self::AccountId, Balance = BalanceOf<Self>>
 			+ fungibles::Mutate<Self::AccountId>
 			+ fungibles::Create<Self::AccountId>;
+			
+
+		type RuntimeHoldReason: From<HoldReason>;
 
 		const NATIVE_ASSET_ID: AssetIdOf<Self>;
 
@@ -200,6 +205,14 @@ pub mod pallet {
 			amount: BalanceOf<T>,
 			title: BoundedVec<u8, ConstU32<32>>,
 		},
+	}
+
+	/// A reason for placing a hold on funds.
+	#[pallet::composite_enum]
+	pub enum HoldReason {
+		/// Funds held for stake proposing spend.
+		#[codec(index = 0)]
+		SpendingProposal,
 	}
 
 	/// Errors inform users that something went wrong.
@@ -488,6 +501,8 @@ pub mod pallet {
 			payout_type: PayoutType,
 		) -> DispatchResult {
 			Self::check_payout_type(&payout_type)?;
+
+			T::NativeBalance::hold(&HoldReason::SpendingProposal.into(), &proposer, 100u32.into())?;
 
 			let price_in_usd = T::AssetPriceLookup::usd_price(&asset_id, amount);
 

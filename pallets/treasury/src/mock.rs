@@ -68,7 +68,7 @@ impl pallet_balances::Config for Test {
 	type MaxLocks = ConstU32<10>;
 	type MaxReserves = ();
 	type ReserveIdentifier = [u8; 8];
-	type RuntimeHoldReason = ();
+	type RuntimeHoldReason = RuntimeHoldReason;
 	type FreezeIdentifier = ();
 	type MaxFreezes = ConstU32<10>;
 }
@@ -134,6 +134,7 @@ impl pallet_treasury::Config for Test {
 	const NATIVE_ASSET_ID: crate::AssetIdOf<Self> = 0;
 	type SmallSpenderThreshold = SmallSpenderThreshold;
 	type MediumSpenderThreshold = MediumSpenderThreshold;
+	type RuntimeHoldReason = RuntimeHoldReason;
 }
 
 // pub fn new_test_ext() -> sp_io::TestExternalities {

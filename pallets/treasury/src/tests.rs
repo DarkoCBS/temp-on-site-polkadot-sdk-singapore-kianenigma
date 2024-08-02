@@ -135,6 +135,8 @@ fn approve_proposal_instant_payout() {
 			PayoutType::Instant
 		));
 
+		System::assert_last_event(Event::AddedProposal { proposer: ALICE, index_count: 0, amount: 123_000, title: BoundedVec::truncate_from("Title".as_bytes().into()) }.into() );
+
 		// Check pre state
 		assert_eq!(SpendingProposals::<Test>::get(ALICE, 0).unwrap().approved, false);
 
@@ -144,7 +146,7 @@ fn approve_proposal_instant_payout() {
 		assert_ok!(Treasury::approve_proposal(RuntimeOrigin::signed(governance_origin), ALICE, 0));
 
 		// Check Alice post balance
-		assert_eq!(<Test as Config>::NativeBalance::balance(&ALICE), 223_000);
+		assert_eq!(<Test as Config>::NativeBalance::balance(&ALICE), 223_000 - 100);
 	})
 }
 
@@ -174,6 +176,8 @@ fn approve_proposal_periodic_payout() {
 			periodic_payout
 		));
 
+		System::assert_last_event(Event::AddedProposal { proposer: ALICE, index_count: 0, amount: 100_000, title: BoundedVec::truncate_from("Title".as_bytes().into()) }.into() );
+
 		// Check if proposal is stored
 		assert_eq!(SpendingProposals::<Test>::get(ALICE, 0).unwrap().approved, false);
 
@@ -183,7 +187,7 @@ fn approve_proposal_periodic_payout() {
 		assert_ok!(Treasury::approve_proposal(RuntimeOrigin::signed(governance_origin), ALICE, 0));
 
 		// Check upfront payment
-		assert_eq!(<Test as Config>::NativeBalance::balance(&ALICE), 120_000);
+		assert_eq!(<Test as Config>::NativeBalance::balance(&ALICE), 120_000 - 100);
 
 		let initial_block_number = System::block_number();
 		for i in (0..100u128).step_by(10) {
@@ -194,12 +198,12 @@ fn approve_proposal_periodic_payout() {
 
 			// Check periodic payment
 			let payment_instance_counter = i / 10 + 1;
-			let expected_balance = 120_000 + 8_000 * (payment_instance_counter);
+			let expected_balance = 120_000 + 8_000 * (payment_instance_counter) - 100;
 			assert_eq!(<Test as Config>::NativeBalance::balance(&ALICE), expected_balance);
 		}
 
 		// Check Alice balance
-		assert_eq!(<Test as Config>::NativeBalance::balance(&ALICE), 200_000);
+		assert_eq!(<Test as Config>::NativeBalance::balance(&ALICE), 200_000 - 100);
 	})
 }
 
@@ -228,6 +232,9 @@ fn do_propose_spend_wrong_payout_type(){
 			ALICE,
 			periodic_payout
 		), Error::<Test>::PayoutPercentagesMustSumTo100);
+
+		assert_eq!(System::events().len(), 0);
+
 	})
 }
 
