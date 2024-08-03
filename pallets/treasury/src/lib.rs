@@ -18,7 +18,7 @@ mod benchmarking;
 pub mod pallet {
 	use crate::AssetPriceLookup;
 	use frame_support::sp_runtime::traits::AccountIdConversion;
-	use frame_support::traits::tokens::{Precision, Preservation};
+	use frame_support::traits::tokens::{Fortitude, Precision, Preservation};
 	use frame_support::PalletId;
 	use frame_support::{
 		pallet_prelude::*,
@@ -54,11 +54,28 @@ pub mod pallet {
 
 	#[pallet::hooks]
 	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
+		/// Proverava da li ima schedulovanih isplata za trenutni blok i isplati ih
+		/// Ako nema dovoljno sredstava, isplata se pomera za 10 blokova unapred
 		fn on_initialize(_n: BlockNumberFor<T>) -> Weight {
 			let payout_instances = PayoutInstances::<T>::get(_n);
-			for payout in payout_instances {
-				Self::exec_payout_instance(payout);
+			for payout in &payout_instances {
+				let res = Self::exec_payout_instance(&payout);
+				if res.is_err() {
+					let curr_block_number = <frame_system::Pallet<T>>::block_number();
+					let moved_to_block_number = curr_block_number + 10u32.into();
+					PayoutInstances::append(moved_to_block_number, payout);
+					Self::deposit_event(Event::PayoutMovedForward {
+						curr_block_number,
+						moved_to_block_number,
+						proposer: payout.proposer.clone(),
+						beneficiary: payout.beneficiary.clone(),
+						asset_id: payout.asset_id.clone(),
+						amount: payout.amount,
+					});
+				}
 			}
+
+			// Ovde treba neki weight
 			Weight::zero()
 		}
 	}
@@ -88,7 +105,7 @@ pub mod pallet {
 			
 
 		/// Type to access the Assets Pallet.
-		type Fungibles: fungibles::Inspect<Self::AccountId, Balance = BalanceOf<Self>>
+		type Fungibles: fungibles::Inspect<Self::AccountId , Balance = BalanceOf<Self>>
 			+ fungibles::Mutate<Self::AccountId>
 			+ fungibles::Create<Self::AccountId>;
 			
@@ -209,6 +226,14 @@ pub mod pallet {
 			amount: BalanceOf<T>,
 			title: BoundedVec<u8, ConstU32<32>>,
 		},
+		PayoutMovedForward{
+			curr_block_number: BlockNumberFor<T>,
+			moved_to_block_number: BlockNumberFor<T>,
+			proposer: T::AccountId,
+			beneficiary: T::AccountId,
+			asset_id: AssetIdOf<T>,
+			amount: BalanceOf<T>,
+		}
 	}
 
 	/// A reason for placing a hold on funds.
@@ -340,7 +365,30 @@ pub mod pallet {
 			Ok(())
 		}
 
-		// Let's imagine you wanted to build a transfer extrinsic inside your pallet...
+		pub fn exchange_funds_in_treasury(
+			origin: OriginFor<T>,
+			asset_id_a: AssetIdOf<T>,
+			amount_a: BalanceOf<T>,
+			asset_id_b: AssetIdOf<T>,
+		) -> DispatchResult {
+			let _who = T::GovernanceOrigin::ensure_origin(origin)?;
+			let amount_b = T::AssetPriceLookup::price_lookup(asset_id_a.clone(), amount_a, asset_id_b.clone());
+
+			if asset_id_a == T::NATIVE_ASSET_ID {
+				T::NativeBalance::burn_from(&Self::treasury_account_id(), amount_a, Preservation::Preserve, Precision::BestEffort, Fortitude::Polite)?;
+			} else {
+				T::Fungibles::burn_from(asset_id_a, &Self::treasury_account_id(), amount_a, Preservation::Preserve, Precision::BestEffort, Fortitude::Polite)?;
+			}
+
+			if asset_id_b == T::NATIVE_ASSET_ID {
+				T::NativeBalance::mint_into(&Self::treasury_account_id(), amount_b)?;
+			} else {
+				T::Fungibles::mint_into(asset_id_b, &Self::treasury_account_id(), amount_b)?;
+			}
+			Ok(())
+		}
+
+		// Let's imagine you wanted to build a transfer extrinsic inside your pallet...)
 		// This doesn't really make sense to do, since this functionality exists in the `Balances`
 		// pallet, but it illustrates how to use the `BalanceOf<T>` type and the `T::NativeBalance`
 		// api.
@@ -395,7 +443,7 @@ pub mod pallet {
 						Self::send_asset_funds_to_beneficiary(
 							&proposal.beneficiary,
 							upfront_amount,
-							proposal.asset_id.clone(),
+							&proposal.asset_id,
 						)?;
 					}
 
@@ -426,7 +474,7 @@ pub mod pallet {
 						Self::send_asset_funds_to_beneficiary(
 							&proposal.beneficiary,
 							proposal.amount,
-							proposal.asset_id.clone(),
+							&proposal.asset_id,
 						)?;
 					}
 				},
@@ -451,10 +499,10 @@ pub mod pallet {
 		pub fn send_asset_funds_to_beneficiary(
 			beneficiary: &T::AccountId,
 			amount: BalanceOf<T>,
-			asset_id: AssetIdOf<T>,
+			asset_id: &AssetIdOf<T>,
 		) -> DispatchResult {
 			T::Fungibles::transfer(
-				asset_id,
+				asset_id.clone(),
 				&Self::treasury_account_id(),
 				&beneficiary,
 				amount,
@@ -480,7 +528,7 @@ pub mod pallet {
 			Ok(())
 		}
 
-		fn exec_payout_instance(payout_instance: PeriodicPayoutInstance<T>) -> DispatchResult {
+		fn exec_payout_instance(payout_instance: &PeriodicPayoutInstance<T>) -> DispatchResult {
 			if payout_instance.asset_id == T::NATIVE_ASSET_ID {
 				Self::send_native_funds_to_beneficiary(
 					&payout_instance.beneficiary,
@@ -490,7 +538,7 @@ pub mod pallet {
 				Self::send_asset_funds_to_beneficiary(
 					&payout_instance.beneficiary,
 					payout_instance.amount,
-					payout_instance.asset_id,
+					&payout_instance.asset_id,
 				)?;
 			}
 			Ok(())
