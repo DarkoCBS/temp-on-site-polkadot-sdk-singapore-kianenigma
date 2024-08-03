@@ -465,7 +465,7 @@ pub mod pallet {
 					// Setup periodic payouts
 					let curr_block_number: BlockNumberFor<T> =
 						<frame_system::Pallet<T>>::block_number();
-					for i in 0..number_of_payout_instances {
+					for i in 1..=number_of_payout_instances {
 						let block_number: BlockNumberFor<T> =
 							curr_block_number + (i as u32 * payment_each_n_blocks).into();
 						let payout_instance: PeriodicPayoutInstance<T> = PeriodicPayoutInstance {
