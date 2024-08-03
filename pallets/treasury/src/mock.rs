@@ -8,10 +8,7 @@ use frame_support::{parameter_types, PalletId};
 use frame_system::{EnsureRoot, EnsureSigned, EnsureSignedBy};
 use sp_core::H256;
 use sp_runtime::traits::AccountIdConversion;
-use sp_runtime::{
-	traits::{BlakeTwo256, IdentityLookup},
-	BuildStorage,
-};
+use sp_runtime::traits::{BlakeTwo256, IdentityLookup};
 
 type Block = frame_system::mocking::MockBlock<Test>;
 pub type Balance = u128;

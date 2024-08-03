@@ -18,6 +18,7 @@ mod benchmarking;
 pub mod pallet {
 	use crate::AssetPriceLookup;
 	use frame_support::sp_runtime::traits::AccountIdConversion;
+	use frame_support::traits::fungible::MutateHold;
 	use frame_support::traits::tokens::{Fortitude, Precision, Preservation};
 	use frame_support::PalletId;
 	use frame_support::{
@@ -31,11 +32,8 @@ pub mod pallet {
 	};
 	use frame_system::pallet_prelude::{OriginFor, *};
 	use sp_runtime::Percent;
-	use frame_support::traits::fungible::MutateHold;
 
 	const PALLET_ID: PalletId = PalletId(*b"treasury");
-
-	
 
 	pub type AssetIdOf<T> = <<T as Config>::Fungibles as fungibles::Inspect<
 		<T as frame_system::Config>::AccountId,
@@ -102,13 +100,11 @@ pub mod pallet {
 			+ fungible::hold::Mutate<Self::AccountId, Reason = Self::RuntimeHoldReason>
 			+ fungible::freeze::Inspect<Self::AccountId>
 			+ fungible::freeze::Mutate<Self::AccountId>;
-			
 
 		/// Type to access the Assets Pallet.
-		type Fungibles: fungibles::Inspect<Self::AccountId , Balance = BalanceOf<Self>>
+		type Fungibles: fungibles::Inspect<Self::AccountId, Balance = BalanceOf<Self>>
 			+ fungibles::Mutate<Self::AccountId>
 			+ fungibles::Create<Self::AccountId>;
-			
 
 		type RuntimeHoldReason: From<HoldReason>;
 
@@ -226,14 +222,14 @@ pub mod pallet {
 			amount: BalanceOf<T>,
 			title: BoundedVec<u8, ConstU32<32>>,
 		},
-		PayoutMovedForward{
+		PayoutMovedForward {
 			curr_block_number: BlockNumberFor<T>,
 			moved_to_block_number: BlockNumberFor<T>,
 			proposer: T::AccountId,
 			beneficiary: T::AccountId,
 			asset_id: AssetIdOf<T>,
 			amount: BalanceOf<T>,
-		}
+		},
 	}
 
 	/// A reason for placing a hold on funds.
@@ -361,7 +357,12 @@ pub mod pallet {
 				None => return Err("Proposal does not exist"),
 			})?;
 
-			T::NativeBalance::release(&HoldReason::SpendingProposal.into(), &proposer, T::AmountHeldOnProposal::get(), Precision::BestEffort)?;
+			T::NativeBalance::release(
+				&HoldReason::SpendingProposal.into(),
+				&proposer,
+				T::AmountHeldOnProposal::get(),
+				Precision::BestEffort,
+			)?;
 			Ok(())
 		}
 
@@ -372,12 +373,26 @@ pub mod pallet {
 			asset_id_b: AssetIdOf<T>,
 		) -> DispatchResult {
 			let _who = T::GovernanceOrigin::ensure_origin(origin)?;
-			let amount_b = T::AssetPriceLookup::price_lookup(asset_id_a.clone(), amount_a, asset_id_b.clone());
+			let amount_b =
+				T::AssetPriceLookup::price_lookup(asset_id_a.clone(), amount_a, asset_id_b.clone());
 
 			if asset_id_a == T::NATIVE_ASSET_ID {
-				T::NativeBalance::burn_from(&Self::treasury_account_id(), amount_a, Preservation::Preserve, Precision::BestEffort, Fortitude::Polite)?;
+				T::NativeBalance::burn_from(
+					&Self::treasury_account_id(),
+					amount_a,
+					Preservation::Preserve,
+					Precision::BestEffort,
+					Fortitude::Polite,
+				)?;
 			} else {
-				T::Fungibles::burn_from(asset_id_a, &Self::treasury_account_id(), amount_a, Preservation::Preserve, Precision::BestEffort, Fortitude::Polite)?;
+				T::Fungibles::burn_from(
+					asset_id_a,
+					&Self::treasury_account_id(),
+					amount_a,
+					Preservation::Preserve,
+					Precision::BestEffort,
+					Fortitude::Polite,
+				)?;
 			}
 
 			if asset_id_b == T::NATIVE_ASSET_ID {
@@ -589,9 +604,9 @@ pub mod pallet {
 				proposer,
 				index_count,
 				amount,
-				title: title.clone()
+				title: title.clone(),
 			});
-			
+
 			Ok(())
 		}
 	}

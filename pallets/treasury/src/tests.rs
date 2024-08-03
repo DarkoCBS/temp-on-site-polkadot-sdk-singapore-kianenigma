@@ -3,11 +3,10 @@ use frame_support::assert_err;
 use frame_support::traits::fungible::Inspect;
 use frame_support::traits::fungible::Mutate;
 use frame_support::traits::Hooks;
-use frame_support::{assert_noop, assert_ok, traits::fungibles};
+use frame_support::{assert_ok, traits::fungibles};
 use sp_io::TestExternalities as TestState;
 use sp_runtime::traits::BadOrigin;
 use sp_runtime::BoundedVec;
-use crate::tests::AmountHeldOnProposal;
 
 pub(crate) const ALICE: u64 = 1;
 pub(crate) const BOB: u64 = 2;
@@ -21,9 +20,7 @@ impl Default for StateBuilder {
 	fn default() -> Self {
 		let treasury_account_id = Treasury::treasury_account_id();
 
-		Self {
-			balances: vec![(treasury_account_id, 999_999), (ALICE, 100_000), (BOB, 100_000)],
-		}
+		Self { balances: vec![(treasury_account_id, 999_999), (ALICE, 100_000), (BOB, 100_000)] }
 	}
 }
 
@@ -111,7 +108,15 @@ fn spending_proposal_instant_payout() {
 			PayoutType::Instant
 		));
 
-		System::assert_last_event(Event::AddedProposal { proposer: ALICE, index_count: 0, amount: 123_000, title: BoundedVec::truncate_from("Title".as_bytes().into()) }.into() );
+		System::assert_last_event(
+			Event::AddedProposal {
+				proposer: ALICE,
+				index_count: 0,
+				amount: 123_000,
+				title: BoundedVec::truncate_from("Title".as_bytes().into()),
+			}
+			.into(),
+		);
 
 		// Check post state
 		assert!(SpendingProposals::<Test>::get(ALICE, 0).is_some());
@@ -136,7 +141,15 @@ fn approve_proposal_instant_payout() {
 			PayoutType::Instant
 		));
 
-		System::assert_last_event(Event::AddedProposal { proposer: ALICE, index_count: 0, amount: 123_000, title: BoundedVec::truncate_from("Title".as_bytes().into()) }.into() );
+		System::assert_last_event(
+			Event::AddedProposal {
+				proposer: ALICE,
+				index_count: 0,
+				amount: 123_000,
+				title: BoundedVec::truncate_from("Title".as_bytes().into()),
+			}
+			.into(),
+		);
 
 		// Check pre state
 		assert_eq!(SpendingProposals::<Test>::get(ALICE, 0).unwrap().approved, false);
@@ -177,7 +190,15 @@ fn approve_proposal_periodic_payout() {
 			periodic_payout
 		));
 
-		System::assert_last_event(Event::AddedProposal { proposer: ALICE, index_count: 0, amount: 100_000, title: BoundedVec::truncate_from("Title".as_bytes().into()) }.into() );
+		System::assert_last_event(
+			Event::AddedProposal {
+				proposer: ALICE,
+				index_count: 0,
+				amount: 100_000,
+				title: BoundedVec::truncate_from("Title".as_bytes().into()),
+			}
+			.into(),
+		);
 
 		// Check if proposal is stored
 		assert_eq!(SpendingProposals::<Test>::get(ALICE, 0).unwrap().approved, false);
@@ -193,7 +214,7 @@ fn approve_proposal_periodic_payout() {
 		let initial_block_number = System::block_number();
 		for i in (0..100u128).step_by(10) {
 			// Fast forward 10 blocks
-			let block_number: u64 =  initial_block_number + i as u64;
+			let block_number: u64 = initial_block_number + i as u64;
 			System::set_block_number(block_number);
 			Treasury::on_initialize(block_number);
 
@@ -209,7 +230,7 @@ fn approve_proposal_periodic_payout() {
 }
 
 #[test]
-fn do_propose_spend_wrong_payout_type(){
+fn do_propose_spend_wrong_payout_type() {
 	StateBuilder::default().build_and_execute(|| {
 		// Check alice balance
 		assert_eq!(<Test as Config>::NativeBalance::balance(&ALICE), 100_000);
@@ -223,19 +244,21 @@ fn do_propose_spend_wrong_payout_type(){
 		});
 
 		// Propose spend
-		assert_err!(Treasury::propose_spend(
-			RuntimeOrigin::signed(ALICE),
-			BoundedVec::truncate_from("Title".as_bytes().into()),
-			BoundedVec::truncate_from("Description".as_bytes().to_vec()),
-			0,
-			100_000,
-			ALICE,
-			ALICE,
-			periodic_payout
-		), Error::<Test>::PayoutPercentagesMustSumTo100);
+		assert_err!(
+			Treasury::propose_spend(
+				RuntimeOrigin::signed(ALICE),
+				BoundedVec::truncate_from("Title".as_bytes().into()),
+				BoundedVec::truncate_from("Description".as_bytes().to_vec()),
+				0,
+				100_000,
+				ALICE,
+				ALICE,
+				periodic_payout
+			),
+			Error::<Test>::PayoutPercentagesMustSumTo100
+		);
 
 		assert_eq!(System::events().len(), 0);
-
 	})
 }
 
@@ -317,6 +340,9 @@ fn handle_assets() {
 		));
 
 		// And here we can see that alice has this balance.
-		assert_eq!(<Test as Config>::Fungibles::balance(asset_id, &alice), <Test as pallet::Config>::AmountHeldOnProposal::get());
+		assert_eq!(
+			<Test as Config>::Fungibles::balance(asset_id, &alice),
+			<Test as pallet::Config>::AmountHeldOnProposal::get()
+		);
 	});
 }
