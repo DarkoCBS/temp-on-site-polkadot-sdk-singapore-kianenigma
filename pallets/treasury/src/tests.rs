@@ -349,7 +349,6 @@ pub fn payout_moved_forward() {
 			let payment_instance_counter = i / 10;
 			let expected_balance = 600_000 + 50_000 * (payment_instance_counter);
 			assert_eq!(<Test as Config>::NativeBalance::balance(&ALICE), expected_balance);
-			println!("BLOCK: {}", block_number);
 		}
 
 		System::set_block_number(block_number + 10);

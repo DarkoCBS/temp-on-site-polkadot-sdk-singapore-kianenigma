@@ -184,6 +184,7 @@ pub mod pallet {
 		spender_type: Origin,
 		payout_type: PayoutType,
 		pub approved: bool,
+		pub completed: bool,
 	}
 
 	/// The pallet's storage items.
@@ -403,25 +404,49 @@ pub mod pallet {
 			Ok(())
 		}
 
-		// Let's imagine you wanted to build a transfer extrinsic inside your pallet...)
-		// This doesn't really make sense to do, since this functionality exists in the `Balances`
-		// pallet, but it illustrates how to use the `BalanceOf<T>` type and the `T::NativeBalance`
-		// api.
-		// pub fn my_transfer_function(
-		// 	origin: OriginFor<T>,
-		// 	to: T::AccountId,
-		// 	amount: BalanceOf<T>,
-		// ) -> DispatchResult {
-		// 	// Probably you would import these at the top of you file, not here, but just trying to
-		// 	// illustrate that you need to import this trait to access the function inside of it.
-		// 	use frame_support::traits::fungible::Mutate;
-		// 	// Read the docs on this to understand what it does...
-		// 	use frame_support::traits::tokens::Preservation;
+		pub fn confirm_full_completion(
+			origin: OriginFor<T>,
+			proposer: T::AccountId,
+			index: u16,
+		) -> DispatchResult {
+			let _who = T::GovernanceOrigin::ensure_origin(origin)?;
+			SpendingProposals::<T>::try_mutate(&proposer, index, |proposal| match proposal {
+				Some(p) => {
+					if !p.approved {
+						return Err("Proposal not approved");
+					}
+					if p.completed {
+						return Err("Proposal already completed");
+					}
 
-		// 	let sender = ensure_signed(origin)?;
-		// 	T::NativeBalance::transfer(&sender, &to, amount, Preservation::Expendable)?;
-		// 	Ok(())
-		// }
+					p.completed = true;
+
+					if let PayoutType::Periodic(periodic_payout_percentage) = &p.payout_type {
+						if periodic_payout_percentage.after_fully_complete > 0 {
+							if p.asset_id == T::NATIVE_ASSET_ID {
+								Self::send_native_funds_to_beneficiary(
+									&p.beneficiary,
+									Percent::from_percent(periodic_payout_percentage.after_fully_complete)
+										* p.amount,
+								)?;
+							} else {
+								Self::send_asset_funds_to_beneficiary(
+									&p.beneficiary,
+									Percent::from_percent(periodic_payout_percentage.after_fully_complete)
+										* p.amount,
+									&p.asset_id,
+								)?;
+							}
+						}
+
+					}
+
+					return Ok(());	
+				}
+				None => return Err("Proposal does not exist"),
+			})?;
+			Ok(())
+		}
 	}
 
 	// NOTE: This is regular rust, and how you would implement functions onto an object.
@@ -595,6 +620,7 @@ pub mod pallet {
 				spender_type,
 				approved: false,
 				payout_type,
+				completed: false,
 			};
 
 			SpendingProposals::<T>::insert(&proposer, index_count, proposal);
