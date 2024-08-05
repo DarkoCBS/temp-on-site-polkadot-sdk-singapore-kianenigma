@@ -171,7 +171,7 @@ pub mod pallet {
 		amount: BalanceOf<T>,
 	}
 
-	#[derive(TypeInfo, Encode, Decode, MaxEncodedLen)]
+	#[derive(TypeInfo, Encode, Decode, MaxEncodedLen, Debug)]
 	#[scale_info(skip_type_params(T))]
 	pub struct SpendingProposal<T: Config> {
 		title: BoundedVec<u8, ConstU32<32>>,

@@ -20,7 +20,7 @@ impl Default for StateBuilder {
 	fn default() -> Self {
 		let treasury_account_id = Treasury::treasury_account_id();
 
-		Self { balances: vec![(treasury_account_id, 999_999), (ALICE, 100_000), (BOB, 100_000)] }
+		Self { balances: vec![(treasury_account_id, 999_999), (ALICE, 100_000), (BOB, 500_000)] }
 	}
 }
 
@@ -54,11 +54,13 @@ impl StateBuilder {
 		self
 	}
 
-	fn add_treasury_balance(mut self, amount: Balance) -> Self {
+	fn set_treasury_balance(mut self, _amount: Balance) -> Self {
 		let treasury_account = Treasury::treasury_account_id();
-		// println!("Treasury_account: {:?}", treasury_account);
-		// <Test as Config>::NativeBalance::set_balance(treasury_account, amount);
-		self.balances.push((treasury_account, amount));
+		for (who, amount) in &mut self.balances {
+			if who == &treasury_account {
+				*amount = _amount;
+			}
+		}
 		self
 	}
 }
@@ -366,8 +368,137 @@ pub fn payout_moved_forward() {
 			.into(),
 		);
 
-		assert_eq!(<Test as Config>::NativeBalance::balance(&ALICE), 1_050_000)
-	})
+		assert_eq!(<Test as Config>::NativeBalance::balance(&ALICE), 1_050_000);
+
+		// Check Treasury balance
+		assert_eq!(
+			<Test as Config>::NativeBalance::balance(&Treasury::treasury_account_id()),
+			999_999 - 950_000
+		);
+
+		// Fund Treasury to be able to send last payment
+		let fund_treasury_amount = 1;
+		assert_ok!(Treasury::fund_treasury_native(
+			RuntimeOrigin::signed(BOB),
+			fund_treasury_amount
+		));
+
+		System::set_block_number(block_number + 20);
+		Treasury::on_initialize(block_number + 20);
+
+		// Assert that the last payment was sent
+		assert_eq!(<Test as Config>::NativeBalance::balance(&ALICE), 1_100_000);
+	});
+}
+
+#[test]
+fn periodic_payout_complex_case(){
+	StateBuilder::default().set_treasury_balance(799_999).build_and_execute(|| {
+		// Check alice balance
+		assert_eq!(<Test as Config>::NativeBalance::balance(&ALICE), 100_000);
+		// Check treasury balance
+		assert_eq!(
+			<Test as Config>::NativeBalance::balance(&Treasury::treasury_account_id()),
+			799_999
+		);
+
+		let periodic_payout = PayoutType::Periodic(PeriodicPayoutPercentage {
+			upfront: 40,
+			after_fully_complete: 20,
+			periodic: 40,
+			num_of_periodic_payouts: NumOfPeriodicPayouts::Ten,
+			payment_each_n_blocks: 10,
+		});
+
+		// Propose spend
+		assert_ok!(Treasury::propose_spend(
+			RuntimeOrigin::signed(ALICE),
+			BoundedVec::truncate_from("Title".as_bytes().into()),
+			BoundedVec::truncate_from("Description".as_bytes().to_vec()),
+			0,
+			1_000_000,
+			ALICE,
+			ALICE,
+			periodic_payout
+		));
+
+		System::assert_last_event(
+			Event::AddedProposal {
+				proposer: ALICE,
+				index_count: 0,
+				amount: 1_000_000,
+				title: BoundedVec::truncate_from("Title".as_bytes().into()),
+			}
+			.into(),
+		);
+
+		// Check if proposal is stored
+		assert_eq!(SpendingProposals::<Test>::get(ALICE, 0).unwrap().approved, false);
+
+		let governance_origin = GovernanceOrigin::get();
+
+		// Approve proposal
+		assert_ok!(Treasury::approve_proposal(RuntimeOrigin::signed(governance_origin), ALICE, 0));
+
+		// Check upfront payment
+		assert_eq!(<Test as Config>::NativeBalance::balance(&ALICE), 500_000);
+
+		let initial_block_number = System::block_number();
+		let mut block_number = initial_block_number;
+		for i in (10..=90u128).step_by(10) {
+			// Fast forward 10 blocks
+			block_number = initial_block_number + i as u64;
+			System::set_block_number(block_number);
+			Treasury::on_initialize(block_number);
+
+			// Check periodic payment
+			let payment_instance_counter = i / 10;
+			let expected_balance = 500_000 + 40_000 * (payment_instance_counter);
+			assert_eq!(<Test as Config>::NativeBalance::balance(&ALICE), expected_balance);
+		}
+
+		System::set_block_number(block_number + 10);
+		Treasury::on_initialize(block_number + 10);
+
+		System::assert_last_event(
+			Event::PayoutMovedForward {
+				curr_block_number: 101,
+				moved_to_block_number: 111,
+				proposer: ALICE,
+				beneficiary: ALICE,
+				asset_id: 0,
+				amount: 40_000,
+			}
+			.into(),
+		);
+
+		assert_eq!(<Test as Config>::NativeBalance::balance(&ALICE), 860_000);
+
+		// Check Treasury balance
+		assert_eq!(
+			<Test as Config>::NativeBalance::balance(&Treasury::treasury_account_id()),
+			39_999
+		);
+
+		// Fund Treasury to be able to send last payment
+		let fund_treasury_amount = 500_000;
+		assert_ok!(Treasury::fund_treasury_native(
+			RuntimeOrigin::signed(BOB),
+			fund_treasury_amount
+		));
+
+		System::set_block_number(block_number + 20);
+		Treasury::on_initialize(block_number + 20);
+
+		// Assert that the last payment was sent
+		assert_eq!(<Test as Config>::NativeBalance::balance(&ALICE), 900_000);
+
+		// Confirm proposal is complete
+		assert_ok!(Treasury::confirm_full_completion(RuntimeOrigin::signed(governance_origin), ALICE, 0));
+
+		// Check Alice balance
+		assert_eq!(<Test as Config>::NativeBalance::balance(&ALICE), 1_100_000);
+	});
 }
 
 // #[test]
