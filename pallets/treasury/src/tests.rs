@@ -7,11 +7,19 @@ use frame_support::{assert_ok, traits::fungibles};
 use sp_io::TestExternalities as TestState;
 use sp_runtime::traits::BadOrigin;
 use sp_runtime::BoundedVec;
+use sp_runtime::Percent;
 
+// Constants for test accounts
 pub(crate) const ALICE: u64 = 1;
 pub(crate) const BOB: u64 = 2;
-pub(crate) const CHARLIE: u64 = 3;
 
+const TREASURY_INITIAL_BALANCE: Balance = 999_999;
+const ALICE_INITIAL_BALANCE: Balance = 100_000;
+const BOB_INITIAL_BALANCE: Balance = 500_000;
+
+const FUND_TREASURY_AMOUNT: Balance = 1;
+
+// StateBuilder struct to manage initial state
 pub(crate) struct StateBuilder {
 	balances: Vec<(<Test as frame_system::Config>::AccountId, Balance)>,
 }
@@ -20,7 +28,13 @@ impl Default for StateBuilder {
 	fn default() -> Self {
 		let treasury_account_id = Treasury::treasury_account_id();
 
-		Self { balances: vec![(treasury_account_id, 999_999), (ALICE, 100_000), (BOB, 500_000)] }
+		Self {
+			balances: vec![
+				(treasury_account_id, TREASURY_INITIAL_BALANCE),
+				(ALICE, ALICE_INITIAL_BALANCE),
+				(BOB, BOB_INITIAL_BALANCE),
+			],
+		}
 	}
 }
 
@@ -70,24 +84,23 @@ fn fund_treasury_asset() {
 	StateBuilder::default().build_and_execute(|| {
 		// Check initial treasury balance
 		let treasury_account = &Treasury::treasury_account_id();
-		assert_eq!(<Test as Config>::NativeBalance::balance(treasury_account), 999_999);
+		assert_eq!(<Test as Config>::NativeBalance::balance(treasury_account), TREASURY_INITIAL_BALANCE);
 
 		// Fund Treasury
-		let fund_treasury_amount = 1;
 		assert_ok!(Treasury::fund_treasury_native(
 			RuntimeOrigin::signed(ALICE),
-			fund_treasury_amount
+			FUND_TREASURY_AMOUNT
 		));
 
 		// Check Treasury balance after funding
 		assert_eq!(
 			<Test as Config>::NativeBalance::balance(treasury_account),
-			999_999 + fund_treasury_amount
+			TREASURY_INITIAL_BALANCE + FUND_TREASURY_AMOUNT
 		);
 		// Check Alice balance after funding
 		assert_eq!(
 			<Test as Config>::NativeBalance::balance(&ALICE),
-			100_000 - fund_treasury_amount
+			ALICE_INITIAL_BALANCE - FUND_TREASURY_AMOUNT
 		);
 	});
 }
@@ -95,6 +108,8 @@ fn fund_treasury_asset() {
 #[test]
 fn spending_proposal_instant_payout() {
 	StateBuilder::default().build_and_execute(|| {
+		let PROPOSAL_AMOUNT = 123_000;
+
 		// Check pre state
 		assert!(SpendingProposals::<Test>::get(ALICE, 0).is_none());
 
@@ -104,7 +119,7 @@ fn spending_proposal_instant_payout() {
 			BoundedVec::truncate_from("Title".as_bytes().into()),
 			BoundedVec::truncate_from("Description".as_bytes().to_vec()),
 			0,
-			123_000,
+			PROPOSAL_AMOUNT,
 			ALICE,
 			ALICE,
 			PayoutType::Instant
@@ -114,7 +129,7 @@ fn spending_proposal_instant_payout() {
 			Event::AddedProposal {
 				proposer: ALICE,
 				index_count: 0,
-				amount: 123_000,
+				amount: PROPOSAL_AMOUNT,
 				title: BoundedVec::truncate_from("Title".as_bytes().into()),
 			}
 			.into(),
@@ -127,9 +142,11 @@ fn spending_proposal_instant_payout() {
 
 #[test]
 fn approve_proposal_instant_payout() {
+	let PROPOSAL_AMOUNT = 123_000;
+
 	StateBuilder::default().build_and_execute(|| {
 		// Check Alice init balance
-		assert_eq!(<Test as Config>::NativeBalance::balance(&ALICE), 100_000);
+		assert_eq!(<Test as Config>::NativeBalance::balance(&ALICE), ALICE_INITIAL_BALANCE);
 
 		// Propose spend
 		assert_ok!(Treasury::propose_spend(
@@ -137,7 +154,7 @@ fn approve_proposal_instant_payout() {
 			BoundedVec::truncate_from("Title".as_bytes().into()),
 			BoundedVec::truncate_from("Description".as_bytes().to_vec()),
 			0,
-			123_000,
+			PROPOSAL_AMOUNT,
 			ALICE,
 			ALICE,
 			PayoutType::Instant
@@ -147,7 +164,7 @@ fn approve_proposal_instant_payout() {
 			Event::AddedProposal {
 				proposer: ALICE,
 				index_count: 0,
-				amount: 123_000,
+				amount: PROPOSAL_AMOUNT,
 				title: BoundedVec::truncate_from("Title".as_bytes().into()),
 			}
 			.into(),
@@ -162,15 +179,17 @@ fn approve_proposal_instant_payout() {
 		assert_ok!(Treasury::approve_proposal(RuntimeOrigin::signed(governance_origin), ALICE, 0));
 
 		// Check Alice post balance
-		assert_eq!(<Test as Config>::NativeBalance::balance(&ALICE), 223_000);
+		assert_eq!(<Test as Config>::NativeBalance::balance(&ALICE), ALICE_INITIAL_BALANCE + PROPOSAL_AMOUNT);
 	})
 }
 
 #[test]
 fn approve_proposal_periodic_payout() {
 	StateBuilder::default().build_and_execute(|| {
+		let PROPOSAL_AMOUNT = 100_000;
+
 		// Check alice balance
-		assert_eq!(<Test as Config>::NativeBalance::balance(&ALICE), 100_000);
+		assert_eq!(<Test as Config>::NativeBalance::balance(&ALICE), ALICE_INITIAL_BALANCE);
 
 		let periodic_payout = PayoutType::Periodic(PeriodicPayoutPercentage {
 			upfront: 20,
@@ -186,7 +205,7 @@ fn approve_proposal_periodic_payout() {
 			BoundedVec::truncate_from("Title".as_bytes().into()),
 			BoundedVec::truncate_from("Description".as_bytes().to_vec()),
 			0,
-			100_000,
+			PROPOSAL_AMOUNT,
 			ALICE,
 			ALICE,
 			periodic_payout
@@ -196,7 +215,7 @@ fn approve_proposal_periodic_payout() {
 			Event::AddedProposal {
 				proposer: ALICE,
 				index_count: 0,
-				amount: 100_000,
+				amount: PROPOSAL_AMOUNT,
 				title: BoundedVec::truncate_from("Title".as_bytes().into()),
 			}
 			.into(),
@@ -211,7 +230,8 @@ fn approve_proposal_periodic_payout() {
 		assert_ok!(Treasury::approve_proposal(RuntimeOrigin::signed(governance_origin), ALICE, 0));
 
 		// Check upfront payment
-		assert_eq!(<Test as Config>::NativeBalance::balance(&ALICE), 120_000);
+		let expected_balance_after_upfront = ALICE_INITIAL_BALANCE + 20_000;
+		assert_eq!(<Test as Config>::NativeBalance::balance(&ALICE), expected_balance_after_upfront);
 
 		let initial_block_number = System::block_number();
 		for i in (10..=100u128).step_by(10) {
@@ -222,20 +242,22 @@ fn approve_proposal_periodic_payout() {
 
 			// Check periodic payment
 			let payment_instance_counter = i / 10;
-			let expected_balance = 120_000 + 8_000 * (payment_instance_counter);
+			let expected_balance = expected_balance_after_upfront + 8_000 * (payment_instance_counter);
 			assert_eq!(<Test as Config>::NativeBalance::balance(&ALICE), expected_balance);
 		}
 
 		// Check Alice balance
-		assert_eq!(<Test as Config>::NativeBalance::balance(&ALICE), 200_000);
+		assert_eq!(<Test as Config>::NativeBalance::balance(&ALICE), ALICE_INITIAL_BALANCE + PROPOSAL_AMOUNT);
 	})
 }
 
 #[test]
 fn do_propose_spend_wrong_payout_type() {
 	StateBuilder::default().build_and_execute(|| {
+		let PROPOSAL_AMOUNT = 100_000;
+
 		// Check alice balance
-		assert_eq!(<Test as Config>::NativeBalance::balance(&ALICE), 100_000);
+		assert_eq!(<Test as Config>::NativeBalance::balance(&ALICE), ALICE_INITIAL_BALANCE);
 
 		let periodic_payout = PayoutType::Periodic(PeriodicPayoutPercentage {
 			upfront: 100,
@@ -252,7 +274,7 @@ fn do_propose_spend_wrong_payout_type() {
 				BoundedVec::truncate_from("Title".as_bytes().into()),
 				BoundedVec::truncate_from("Description".as_bytes().to_vec()),
 				0,
-				100_000,
+				PROPOSAL_AMOUNT,
 				ALICE,
 				ALICE,
 				periodic_payout
@@ -267,13 +289,15 @@ fn do_propose_spend_wrong_payout_type() {
 #[test]
 fn approve_proposal_bad_origin() {
 	StateBuilder::default().build_and_execute(|| {
+		let PROPOSAL_AMOUNT = 123_000;
+
 		// Propose spend
 		assert_ok!(Treasury::propose_spend(
 			RuntimeOrigin::signed(ALICE),
 			BoundedVec::truncate_from("Title".as_bytes().into()),
 			BoundedVec::truncate_from("Description".as_bytes().to_vec()),
 			0,
-			123_000,
+			PROPOSAL_AMOUNT,
 			ALICE,
 			ALICE,
 			PayoutType::Instant
@@ -290,12 +314,14 @@ fn approve_proposal_bad_origin() {
 #[test]
 pub fn payout_moved_forward() {
 	StateBuilder::default().build_and_execute(|| {
+		const PROPOSAL_AMOUNT: u128 = 1_000_000;
+		
 		// Check alice balance
-		assert_eq!(<Test as Config>::NativeBalance::balance(&ALICE), 100_000);
+		assert_eq!(<Test as Config>::NativeBalance::balance(&ALICE), ALICE_INITIAL_BALANCE);
 		// Check treasury balance
 		assert_eq!(
 			<Test as Config>::NativeBalance::balance(&Treasury::treasury_account_id()),
-			999_999
+			TREASURY_INITIAL_BALANCE
 		);
 
 		let periodic_payout = PayoutType::Periodic(PeriodicPayoutPercentage {
@@ -312,7 +338,7 @@ pub fn payout_moved_forward() {
 			BoundedVec::truncate_from("Title".as_bytes().into()),
 			BoundedVec::truncate_from("Description".as_bytes().to_vec()),
 			0,
-			1_000_000,
+			PROPOSAL_AMOUNT,
 			ALICE,
 			ALICE,
 			periodic_payout
@@ -322,7 +348,7 @@ pub fn payout_moved_forward() {
 			Event::AddedProposal {
 				proposer: ALICE,
 				index_count: 0,
-				amount: 1_000_000,
+				amount: PROPOSAL_AMOUNT,
 				title: BoundedVec::truncate_from("Title".as_bytes().into()),
 			}
 			.into(),
@@ -337,10 +363,12 @@ pub fn payout_moved_forward() {
 		assert_ok!(Treasury::approve_proposal(RuntimeOrigin::signed(governance_origin), ALICE, 0));
 
 		// Check upfront payment
-		assert_eq!(<Test as Config>::NativeBalance::balance(&ALICE), 600_000);
+		let expected_balance_after_upfront = ALICE_INITIAL_BALANCE + 500_000;
+		assert_eq!(<Test as Config>::NativeBalance::balance(&ALICE), expected_balance_after_upfront);
 
 		let initial_block_number = System::block_number();
 		let mut block_number = initial_block_number;
+		const AMOUNT_PER_PERIODIC_PAYMENT: u128 = 50_000;
 		for i in (10..=90u128).step_by(10) {
 			// Fast forward 10 blocks
 			block_number = initial_block_number + i as u64;
@@ -348,8 +376,9 @@ pub fn payout_moved_forward() {
 			Treasury::on_initialize(block_number);
 
 			// Check periodic payment
+
 			let payment_instance_counter = i / 10;
-			let expected_balance = 600_000 + 50_000 * (payment_instance_counter);
+			let expected_balance = expected_balance_after_upfront + AMOUNT_PER_PERIODIC_PAYMENT * (payment_instance_counter);
 			assert_eq!(<Test as Config>::NativeBalance::balance(&ALICE), expected_balance);
 		}
 
@@ -363,43 +392,46 @@ pub fn payout_moved_forward() {
 				proposer: ALICE,
 				beneficiary: ALICE,
 				asset_id: 0,
-				amount: 50_000,
+				amount: AMOUNT_PER_PERIODIC_PAYMENT,
 			}
 			.into(),
 		);
 
-		assert_eq!(<Test as Config>::NativeBalance::balance(&ALICE), 1_050_000);
+		assert_eq!(<Test as Config>::NativeBalance::balance(&ALICE), ALICE_INITIAL_BALANCE + PROPOSAL_AMOUNT - AMOUNT_PER_PERIODIC_PAYMENT);
 
 		// Check Treasury balance
 		assert_eq!(
 			<Test as Config>::NativeBalance::balance(&Treasury::treasury_account_id()),
-			999_999 - 950_000
+			TREASURY_INITIAL_BALANCE - (PROPOSAL_AMOUNT - AMOUNT_PER_PERIODIC_PAYMENT)
 		);
 
 		// Fund Treasury to be able to send last payment
-		let fund_treasury_amount = 1;
 		assert_ok!(Treasury::fund_treasury_native(
 			RuntimeOrigin::signed(BOB),
-			fund_treasury_amount
+			FUND_TREASURY_AMOUNT
 		));
 
 		System::set_block_number(block_number + 20);
 		Treasury::on_initialize(block_number + 20);
 
 		// Assert that the last payment was sent
-		assert_eq!(<Test as Config>::NativeBalance::balance(&ALICE), 1_100_000);
+		assert_eq!(<Test as Config>::NativeBalance::balance(&ALICE), PROPOSAL_AMOUNT + ALICE_INITIAL_BALANCE);
 	});
 }
 
 #[test]
-fn periodic_payout_complex_case(){
-	StateBuilder::default().set_treasury_balance(799_999).build_and_execute(|| {
+fn periodic_payout_complex_case() {
+	const TREASURY_INITIAL_BALANCE: Balance = 799_999;
+
+	StateBuilder::default().set_treasury_balance(TREASURY_INITIAL_BALANCE).build_and_execute(|| {
+		const PROPOSAL_AMOUNT: u128 = 1_000_000;
+
 		// Check alice balance
-		assert_eq!(<Test as Config>::NativeBalance::balance(&ALICE), 100_000);
+		assert_eq!(<Test as Config>::NativeBalance::balance(&ALICE), ALICE_INITIAL_BALANCE);
 		// Check treasury balance
 		assert_eq!(
 			<Test as Config>::NativeBalance::balance(&Treasury::treasury_account_id()),
-			799_999
+			TREASURY_INITIAL_BALANCE
 		);
 
 		let periodic_payout = PayoutType::Periodic(PeriodicPayoutPercentage {
@@ -410,13 +442,15 @@ fn periodic_payout_complex_case(){
 			payment_each_n_blocks: 10,
 		});
 
+		let AFTER_FULLY_COMPLETE_AMOUNT: u128 = Percent::from_percent(20) * PROPOSAL_AMOUNT; 
+
 		// Propose spend
 		assert_ok!(Treasury::propose_spend(
 			RuntimeOrigin::signed(ALICE),
 			BoundedVec::truncate_from("Title".as_bytes().into()),
 			BoundedVec::truncate_from("Description".as_bytes().to_vec()),
 			0,
-			1_000_000,
+			PROPOSAL_AMOUNT,
 			ALICE,
 			ALICE,
 			periodic_payout
@@ -426,7 +460,7 @@ fn periodic_payout_complex_case(){
 			Event::AddedProposal {
 				proposer: ALICE,
 				index_count: 0,
-				amount: 1_000_000,
+				amount: PROPOSAL_AMOUNT,
 				title: BoundedVec::truncate_from("Title".as_bytes().into()),
 			}
 			.into(),
@@ -441,10 +475,13 @@ fn periodic_payout_complex_case(){
 		assert_ok!(Treasury::approve_proposal(RuntimeOrigin::signed(governance_origin), ALICE, 0));
 
 		// Check upfront payment
-		assert_eq!(<Test as Config>::NativeBalance::balance(&ALICE), 500_000);
+		const EXPECTED_UPFRONT_PAYMENT: u128 = 400_000;
+		assert_eq!(<Test as Config>::NativeBalance::balance(&ALICE), ALICE_INITIAL_BALANCE + EXPECTED_UPFRONT_PAYMENT);
 
 		let initial_block_number = System::block_number();
 		let mut block_number = initial_block_number;
+		const EXPECTED_BALANCE_AFTER_UPFRONT: u128 = ALICE_INITIAL_BALANCE + EXPECTED_UPFRONT_PAYMENT;
+		const AMOUNT_PER_PERIODIC_PAYMENT: u128 = 40_000;
 		for i in (10..=90u128).step_by(10) {
 			// Fast forward 10 blocks
 			block_number = initial_block_number + i as u64;
@@ -453,7 +490,7 @@ fn periodic_payout_complex_case(){
 
 			// Check periodic payment
 			let payment_instance_counter = i / 10;
-			let expected_balance = 500_000 + 40_000 * (payment_instance_counter);
+			let expected_balance = EXPECTED_BALANCE_AFTER_UPFRONT + AMOUNT_PER_PERIODIC_PAYMENT * (payment_instance_counter);
 			assert_eq!(<Test as Config>::NativeBalance::balance(&ALICE), expected_balance);
 		}
 
@@ -467,12 +504,12 @@ fn periodic_payout_complex_case(){
 				proposer: ALICE,
 				beneficiary: ALICE,
 				asset_id: 0,
-				amount: 40_000,
+				amount: AMOUNT_PER_PERIODIC_PAYMENT,
 			}
 			.into(),
 		);
 
-		assert_eq!(<Test as Config>::NativeBalance::balance(&ALICE), 860_000);
+		assert_eq!(<Test as Config>::NativeBalance::balance(&ALICE), ALICE_INITIAL_BALANCE + PROPOSAL_AMOUNT - AFTER_FULLY_COMPLETE_AMOUNT - AMOUNT_PER_PERIODIC_PAYMENT);
 
 		// Check Treasury balance
 		assert_eq!(
@@ -494,34 +531,63 @@ fn periodic_payout_complex_case(){
 		assert_eq!(<Test as Config>::NativeBalance::balance(&ALICE), 900_000);
 
 		// Confirm proposal is complete
-		assert_ok!(Treasury::confirm_full_completion(RuntimeOrigin::signed(governance_origin), ALICE, 0));
+		assert_ok!(Treasury::confirm_full_completion(
+			RuntimeOrigin::signed(governance_origin),
+			ALICE,
+			0
+		));
 
 		// Check Alice balance
-		assert_eq!(<Test as Config>::NativeBalance::balance(&ALICE), 1_100_000);
+		assert_eq!(<Test as Config>::NativeBalance::balance(&ALICE), PROPOSAL_AMOUNT + ALICE_INITIAL_BALANCE);
 	});
 }
 
-// #[test]
-// fn it_works_for_default_value() {
-// 	StateBuilder::default().build_and_execute(|| {
-// 		// Go past genesis block so events get deposited
-// 		System::set_block_number(1);
-// 		// Dispatch a signed extrinsic.
-// 		assert_ok!(Treasury::do_something(RuntimeOrigin::signed(1), 42));
-// 		// Read pallet storage and assert an expected result.
-// 		// assert_eq!(Something::<Test>::get(), Some(42));
-// 		// Assert that the correct event was deposited
-// 		System::assert_last_event(Event::SomethingStored { something: 42, who: 1 }.into());
-// 	});
-// }
+#[test]
+fn exchange_funds_in_treasury() {
+	StateBuilder::default().build_and_execute(|| {
+		let asset_id = 1;
+		let admin = 0;
+		let is_sufficient = true;
+		let min_balance = 1;
 
-// #[test]
-// fn correct_error_for_none_value() {
-// 	StateBuilder::default().build_and_execute(|| {
-// 		// Ensure the expected error is thrown when no value is present.
-// 		// assert_noop!(Treasury::cause_error(RuntimeOrigin::signed(1)), Error::<Test>::NoneValue);
-// 	});
-// }
+		// Check treasury asset 1 balance
+		assert_eq!(<Test as Config>::Fungibles::balance(1, &Treasury::treasury_account_id()), 0);
+
+		// Check treasury native balance
+		assert_eq!(
+			<Test as Config>::NativeBalance::balance(&Treasury::treasury_account_id()),
+			TREASURY_INITIAL_BALANCE
+		);
+
+		assert_ok!(<<Test as Config>::Fungibles as fungibles::Create<_>>::create(
+			asset_id,
+			admin,
+			is_sufficient,
+			min_balance
+		));
+
+		// Exchange funds in treasury
+		let governance_origin = GovernanceOrigin::get();
+		let exchange_amount = 100_000;
+		assert_ok!(Treasury::exchange_funds_in_treasury(
+			RuntimeOrigin::signed(governance_origin),
+			0,
+			exchange_amount,
+			1,
+		));
+
+		// Check Treasury native balance after exchange
+		assert_eq!(
+			<Test as Config>::NativeBalance::balance(&Treasury::treasury_account_id()),
+			(TREASURY_INITIAL_BALANCE - exchange_amount).into()
+		);
+		// Check Treasury asset 1 balance after exchange
+		assert_eq!(
+			<Test as Config>::Fungibles::balance(1, &Treasury::treasury_account_id()),
+			exchange_amount.into()
+		);
+	});
+}
 
 #[test]
 fn handle_assets() {

@@ -117,17 +117,14 @@ pub mod pallet {
 		// or, do something like this:
 		// type Fungibles: fungibles::Inspect<Self::AccountId, Balance = BalanceOf<Self>>
 
-		// A custom, configurable origin that you can use. It can be wired to be `EnsureSigned`,
-		// `EnsureRoot`, or any custom implementation at the runtime level.
+		// Governance origin to ensure the origin of a call is authorized
 		// https://paritytech.github.io/polkadot-sdk/master/polkadot_sdk_docs/reference_docs/frame_origin/index.html#asserting-on-a-custom-external-origin
 		type GovernanceOrigin: EnsureOrigin<Self::RuntimeOrigin>;
 
 		// Here is an associated type to give you access to your simple asset price lookup function
 		type AssetPriceLookup: crate::AssetPriceLookup<Self>;
 
-		// type SmallSpender: EnsureOrigin<Self::RuntimeOrigin>;
-		// type BigSpender: EnsureOrigin<Self::RuntimeOrigin>;
-
+		// Thresholds for different spender categories
 		#[pallet::constant]
 		type SmallSpenderThreshold: Get<BalanceOf<Self>>;
 		#[pallet::constant]
@@ -282,42 +279,6 @@ pub mod pallet {
 			Ok(())
 		}
 
-		/// An example dispatchable that takes a singles value as a parameter, writes the value to
-		/// storage and emits an event. This function must be dispatched by a signed extrinsic.
-		// pub fn do_something(origin: OriginFor<T>, something: u32) -> DispatchResult {
-		// 	// Check that the extrinsic was signed and get the signer.
-		// 	// This function will return an error if the extrinsic is not signed.
-		// 	// // https://paritytech.github.io/polkadot-sdk/master/polkadot_sdk_docs/reference_docs/frame_origin/index.html
-		// 	let who = ensure_signed(origin)?;
-
-		// 	// Update storage.
-		// 	// <Something<T>>::put(something);
-
-		// 	// Emit an event.
-		// 	Self::deposit_event(Event::SomethingStored { something, who });
-
-		// 	Ok(())
-		// }
-
-		// /// An example dispatchable that may throw a custom error.
-		// pub fn cause_error(origin: OriginFor<T>) -> DispatchResult {
-		// 	let _who = ensure_signed(origin)?;
-
-		// 	Ok(())
-		// 	// Read a value from storage.
-		// 	match <Something<T>>::get() {
-		// 		// Return an error if the value has not been set.
-		// 		None => Err(Error::<T>::NoneValue.into()),
-		// 		Some(old) => {
-		// 			// Increment the value read from storage; will error in the event of overflow.
-		// 			let new = old.checked_add(1).ok_or(Error::<T>::StorageOverflow)?;
-		// 			// Update the value in storage with the incremented result.
-		// 			<Something<T>>::put(new);
-		// 			Ok(())
-		// 		},
-		// 	}
-		// }
-
 		pub fn propose_spend(
 			origin: OriginFor<T>,
 			title: BoundedVec<u8, ConstU32<32>>,
@@ -426,23 +387,24 @@ pub mod pallet {
 							if p.asset_id == T::NATIVE_ASSET_ID {
 								Self::send_native_funds_to_beneficiary(
 									&p.beneficiary,
-									Percent::from_percent(periodic_payout_percentage.after_fully_complete)
-										* p.amount,
+									Percent::from_percent(
+										periodic_payout_percentage.after_fully_complete,
+									) * p.amount,
 								)?;
 							} else {
 								Self::send_asset_funds_to_beneficiary(
 									&p.beneficiary,
-									Percent::from_percent(periodic_payout_percentage.after_fully_complete)
-										* p.amount,
+									Percent::from_percent(
+										periodic_payout_percentage.after_fully_complete,
+									) * p.amount,
 									&p.asset_id,
 								)?;
 							}
 						}
-
 					}
 
-					return Ok(());	
-				}
+					return Ok(());
+				},
 				None => return Err("Proposal does not exist"),
 			})?;
 			Ok(())
