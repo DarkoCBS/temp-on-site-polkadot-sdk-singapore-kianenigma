@@ -11,11 +11,68 @@ mod tests;
 #[cfg(feature = "runtime-benchmarks")]
 mod benchmarking;
 
+use codec::{Codec, Decode, Encode, HasCompact, MaxEncodedLen};
+use frame_support::pallet_prelude::ConstU32;
+use frame_support::pallet_prelude::TypeInfo;
+use frame_support::BoundedVec;
+
+#[derive(TypeInfo, Encode, Decode, MaxEncodedLen, Debug, Clone, PartialEq)]
+pub enum NumOfPeriodicPayouts {
+	Five = 5,
+	Ten = 10,
+	Twenty = 20,
+	Fifty = 50,
+}
+
+// full amount = upfront + periodic + after_fully_complete
+#[derive(TypeInfo, Encode, Decode, MaxEncodedLen, Debug, Clone, PartialEq)]
+pub struct PeriodicPayoutPercentage {
+	pub upfront: u8,
+	pub periodic: u8,
+	pub after_fully_complete: u8,
+
+	pub num_of_periodic_payouts: NumOfPeriodicPayouts,
+	pub payment_each_n_blocks: u32,
+}
+
+#[derive(TypeInfo, Encode, Decode, MaxEncodedLen, Debug, Clone, PartialEq)]
+pub enum PayoutType {
+	Periodic(PeriodicPayoutPercentage),
+	Instant,
+}
+
+#[derive(TypeInfo, Encode, Decode, MaxEncodedLen, Debug, Clone, PartialEq)]
+#[scale_info(skip_type_params(T))]
+pub struct PeriodicPayoutInstance<T: Config> {
+	proposer: T::AccountId,
+	// proposal_index: u16,
+	beneficiary: T::AccountId,
+	asset_id: AssetIdOf<T>,
+	amount: BalanceOf<T>,
+}
+
+#[derive(TypeInfo, Encode, Decode, MaxEncodedLen, Debug)]
+#[scale_info(skip_type_params(T))]
+pub struct SpendingProposal<T: Config> {
+	title: BoundedVec<u8, ConstU32<32>>,
+	description: BoundedVec<u8, ConstU32<500>>,
+	proposer: T::AccountId,
+	beneficiary: T::AccountId,
+	#[codec(compact)]
+	amount: BalanceOf<T>,
+	asset_id: AssetIdOf<T>,
+	spender_type: Origin,
+	payout_type: PayoutType,
+	pub approved: bool,
+	pub completed: bool,
+}
+
 // https://paritytech.github.io/polkadot-sdk/master/polkadot_sdk_docs/polkadot_sdk/frame_runtime/index.html
 // https://paritytech.github.io/polkadot-sdk/master/polkadot_sdk_docs/guides/your_first_pallet/index.html
 // https://paritytech.github.io/polkadot-sdk/master/frame_support/attr.pallet.html#dev-mode-palletdev_mode
 #[frame_support::pallet(dev_mode)]
 pub mod pallet {
+	use super::*;
 	use crate::AssetPriceLookup;
 	use frame_support::sp_runtime::traits::AccountIdConversion;
 	use frame_support::traits::fungible::MutateHold;
@@ -140,57 +197,6 @@ pub mod pallet {
 		/// Funds held for stake proposing spend.
 		#[codec(index = 0)]
 		SpendingProposal,
-	}
-
-	#[derive(TypeInfo, Encode, Decode, MaxEncodedLen, Debug, Clone, PartialEq)]
-	pub enum NumOfPeriodicPayouts {
-		Five = 5,
-		Ten = 10,
-		Twenty = 20,
-		Fifty = 50,
-	}
-
-	// full amount = upfront + periodic + after_fully_complete
-	#[derive(TypeInfo, Encode, Decode, MaxEncodedLen, Debug, Clone, PartialEq)]
-	pub struct PeriodicPayoutPercentage {
-		pub upfront: u8,
-		pub periodic: u8,
-		pub after_fully_complete: u8,
-
-		pub num_of_periodic_payouts: NumOfPeriodicPayouts,
-		pub payment_each_n_blocks: u32,
-	}
-
-	#[derive(TypeInfo, Encode, Decode, MaxEncodedLen, Debug, Clone, PartialEq)]
-	pub enum PayoutType {
-		Periodic(PeriodicPayoutPercentage),
-		Instant,
-	}
-
-	#[derive(TypeInfo, Encode, Decode, MaxEncodedLen, Debug, Clone, PartialEq)]
-	#[scale_info(skip_type_params(T))]
-	pub struct PeriodicPayoutInstance<T: Config> {
-		proposer: T::AccountId,
-		// proposal_index: u16,
-		beneficiary: T::AccountId,
-		asset_id: AssetIdOf<T>,
-		amount: BalanceOf<T>,
-	}
-
-	#[derive(TypeInfo, Encode, Decode, MaxEncodedLen, Debug)]
-	#[scale_info(skip_type_params(T))]
-	pub struct SpendingProposal<T: Config> {
-		title: BoundedVec<u8, ConstU32<32>>,
-		description: BoundedVec<u8, ConstU32<500>>,
-		proposer: T::AccountId,
-		beneficiary: T::AccountId,
-		#[codec(compact)]
-		amount: BalanceOf<T>,
-		asset_id: AssetIdOf<T>,
-		spender_type: Origin,
-		payout_type: PayoutType,
-		pub approved: bool,
-		pub completed: bool,
 	}
 
 	/// The pallet's storage items.
