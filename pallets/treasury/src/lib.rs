@@ -47,45 +47,6 @@ pub mod pallet {
 		<T as frame_system::Config>::AccountId,
 	>>::Balance;
 
-	#[pallet::pallet]
-	pub struct Pallet<T>(_);
-
-	#[pallet::hooks]
-	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
-		/// Proverava da li ima schedulovanih isplata za trenutni blok i isplati ih
-		/// Ako nema dovoljno sredstava, isplata se pomera za 10 blokova unapred
-		fn on_initialize(_n: BlockNumberFor<T>) -> Weight {
-			let payout_instances = PayoutInstances::<T>::get(_n);
-			for payout in &payout_instances {
-				let res = Self::exec_payout_instance(&payout);
-				if res.is_err() {
-					let curr_block_number = <frame_system::Pallet<T>>::block_number();
-					let moved_to_block_number = curr_block_number + 10u32.into();
-					PayoutInstances::append(moved_to_block_number, payout);
-					Self::deposit_event(Event::PayoutMovedForward {
-						curr_block_number,
-						moved_to_block_number,
-						proposer: payout.proposer.clone(),
-						beneficiary: payout.beneficiary.clone(),
-						asset_id: payout.asset_id.clone(),
-						amount: payout.amount,
-					});
-				}
-			}
-
-			// Ovde treba neki weight
-			Weight::zero()
-		}
-	}
-
-	#[pallet::origin]
-	#[derive(PartialEq, Eq, Clone, RuntimeDebug, Encode, Decode, TypeInfo, MaxEncodedLen)]
-	pub enum Origin {
-		SmallSpender,
-		MediumSpender,
-		BigSpender,
-	}
-
 	/// Configure the pallet by specifying the parameters and types on which it depends.
 	#[pallet::config]
 	pub trait Config: frame_system::Config {
@@ -131,6 +92,46 @@ pub mod pallet {
 		type MediumSpenderThreshold: Get<BalanceOf<Self>>;
 		#[pallet::constant]
 		type AmountHeldOnProposal: Get<BalanceOf<Self>>;
+	}
+
+	#[pallet::pallet]
+	pub struct Pallet<T>(_);
+
+	/// https://paritytech.github.io/polkadot-sdk/master/polkadot_sdk_docs/guides/your_first_pallet/index.html#event-and-error
+	#[pallet::event]
+	#[pallet::generate_deposit(pub(super) fn deposit_event)]
+	pub enum Event<T: Config> {
+		// index_count is the number of proposals the proposer has made, starting from 0
+		AddedProposal {
+			proposer: T::AccountId,
+			index_count: u16,
+			amount: BalanceOf<T>,
+			title: BoundedVec<u8, ConstU32<32>>,
+		},
+		PayoutMovedForward {
+			curr_block_number: BlockNumberFor<T>,
+			moved_to_block_number: BlockNumberFor<T>,
+			proposer: T::AccountId,
+			beneficiary: T::AccountId,
+			asset_id: AssetIdOf<T>,
+			amount: BalanceOf<T>,
+		},
+	}
+
+	/// Errors inform users that something went wrong.
+	/// https://paritytech.github.io/polkadot-sdk/master/polkadot_sdk_docs/guides/your_first_pallet/index.html#event-and-error
+	#[pallet::error]
+	pub enum Error<T> {
+		PayoutPercentagesMustSumTo100,
+		PaymentEachNBlocksMustBeGreaterThanZero,
+	}
+
+	#[pallet::origin]
+	#[derive(PartialEq, Eq, Clone, RuntimeDebug, Encode, Decode, TypeInfo, MaxEncodedLen)]
+	pub enum Origin {
+		SmallSpender,
+		MediumSpender,
+		BigSpender,
 	}
 
 	#[derive(TypeInfo, Encode, Decode, MaxEncodedLen, Debug, Clone, PartialEq)]
@@ -208,42 +209,12 @@ pub mod pallet {
 		fn build(&self) {}
 	}
 
-	/// Errors inform users that something went wrong.
-	/// https://paritytech.github.io/polkadot-sdk/master/polkadot_sdk_docs/guides/your_first_pallet/index.html#event-and-error
-	#[pallet::event]
-	#[pallet::generate_deposit(pub(super) fn deposit_event)]
-	pub enum Event<T: Config> {
-		// index_count is the number of proposals the proposer has made, starting from 0
-		AddedProposal {
-			proposer: T::AccountId,
-			index_count: u16,
-			amount: BalanceOf<T>,
-			title: BoundedVec<u8, ConstU32<32>>,
-		},
-		PayoutMovedForward {
-			curr_block_number: BlockNumberFor<T>,
-			moved_to_block_number: BlockNumberFor<T>,
-			proposer: T::AccountId,
-			beneficiary: T::AccountId,
-			asset_id: AssetIdOf<T>,
-			amount: BalanceOf<T>,
-		},
-	}
-
 	/// A reason for placing a hold on funds.
 	#[pallet::composite_enum]
 	pub enum HoldReason {
 		/// Funds held for stake proposing spend.
 		#[codec(index = 0)]
 		SpendingProposal,
-	}
-
-	/// Errors inform users that something went wrong.
-	/// https://paritytech.github.io/polkadot-sdk/master/polkadot_sdk_docs/guides/your_first_pallet/index.html#event-and-error
-	#[pallet::error]
-	pub enum Error<T> {
-		PayoutPercentagesMustSumTo100,
-		PaymentEachNBlocksMustBeGreaterThanZero,
 	}
 
 	/// Dispatchable functions allows users to interact with the pallet and invoke state changes.
@@ -408,6 +379,34 @@ pub mod pallet {
 				None => return Err("Proposal does not exist"),
 			})?;
 			Ok(())
+		}
+	}
+
+	#[pallet::hooks]
+	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
+		/// Proverava da li ima schedulovanih isplata za trenutni blok i isplati ih
+		/// Ako nema dovoljno sredstava, isplata se pomera za 10 blokova unapred
+		fn on_initialize(_n: BlockNumberFor<T>) -> Weight {
+			let payout_instances = PayoutInstances::<T>::get(_n);
+			for payout in &payout_instances {
+				let res = Self::exec_payout_instance(&payout);
+				if res.is_err() {
+					let curr_block_number = <frame_system::Pallet<T>>::block_number();
+					let moved_to_block_number = curr_block_number + 10u32.into();
+					PayoutInstances::append(moved_to_block_number, payout);
+					Self::deposit_event(Event::PayoutMovedForward {
+						curr_block_number,
+						moved_to_block_number,
+						proposer: payout.proposer.clone(),
+						beneficiary: payout.beneficiary.clone(),
+						asset_id: payout.asset_id.clone(),
+						amount: payout.amount,
+					});
+				}
+			}
+
+			// Ovde treba neki weight
+			Weight::zero()
 		}
 	}
 
