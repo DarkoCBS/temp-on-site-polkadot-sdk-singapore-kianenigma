@@ -134,6 +134,14 @@ pub mod pallet {
 		BigSpender,
 	}
 
+	/// A reason for placing a hold on funds.
+	#[pallet::composite_enum]
+	pub enum HoldReason {
+		/// Funds held for stake proposing spend.
+		#[codec(index = 0)]
+		SpendingProposal,
+	}
+
 	#[derive(TypeInfo, Encode, Decode, MaxEncodedLen, Debug, Clone, PartialEq)]
 	pub enum NumOfPeriodicPayouts {
 		Five = 5,
@@ -207,14 +215,6 @@ pub mod pallet {
 	#[pallet::genesis_build]
 	impl BuildGenesisConfig for GenesisConfig {
 		fn build(&self) {}
-	}
-
-	/// A reason for placing a hold on funds.
-	#[pallet::composite_enum]
-	pub enum HoldReason {
-		/// Funds held for stake proposing spend.
-		#[codec(index = 0)]
-		SpendingProposal,
 	}
 
 	/// Dispatchable functions allows users to interact with the pallet and invoke state changes.
