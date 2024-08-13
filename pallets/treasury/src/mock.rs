@@ -1,14 +1,12 @@
 use crate as pallet_treasury;
-use frame_support::ord_parameter_types;
 use frame_support::{
-	derive_impl,
+	derive_impl, ord_parameter_types, parameter_types,
 	traits::{AsEnsureOriginWithArg, ConstU128, ConstU16, ConstU32, ConstU64},
+	PalletId,
 };
-use frame_support::{parameter_types, PalletId};
 use frame_system::{EnsureRoot, EnsureSigned, EnsureSignedBy};
 use sp_core::H256;
-use sp_runtime::traits::AccountIdConversion;
-use sp_runtime::traits::{BlakeTwo256, IdentityLookup};
+use sp_runtime::traits::{AccountIdConversion, BlakeTwo256, IdentityLookup};
 
 type Block = frame_system::mocking::MockBlock<Test>;
 pub type Balance = u128;

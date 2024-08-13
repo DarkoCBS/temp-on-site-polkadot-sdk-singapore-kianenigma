@@ -1,13 +1,13 @@
 use crate::{mock::*, *};
-use frame_support::assert_err;
-use frame_support::traits::fungible::Inspect;
-use frame_support::traits::fungible::Mutate;
-use frame_support::traits::Hooks;
-use frame_support::{assert_ok, traits::fungibles};
+use frame_support::{
+	assert_err, assert_ok,
+	traits::{
+		fungible::{Inspect, Mutate},
+		fungibles, Hooks,
+	},
+};
 use sp_io::TestExternalities as TestState;
-use sp_runtime::traits::BadOrigin;
-use sp_runtime::BoundedVec;
-use sp_runtime::Percent;
+use sp_runtime::{traits::BadOrigin, BoundedVec, Percent};
 
 // Constants for test accounts
 pub(crate) const ALICE: u64 = 1;
@@ -394,8 +394,8 @@ pub fn payout_moved_forward() {
 			// Check periodic payment
 
 			let payment_instance_counter = i / 10;
-			let expected_balance = expected_balance_after_upfront
-				+ AMOUNT_PER_PERIODIC_PAYMENT * (payment_instance_counter);
+			let expected_balance = expected_balance_after_upfront +
+				AMOUNT_PER_PERIODIC_PAYMENT * (payment_instance_counter);
 			assert_eq!(<Test as Config>::NativeBalance::balance(&ALICE), expected_balance);
 		}
 
@@ -523,8 +523,8 @@ fn periodic_payout_complex_case() {
 
 				// Check periodic payment
 				let payment_instance_counter = i / 10;
-				let expected_balance = EXPECTED_BALANCE_AFTER_UPFRONT
-					+ AMOUNT_PER_PERIODIC_PAYMENT * (payment_instance_counter);
+				let expected_balance = EXPECTED_BALANCE_AFTER_UPFRONT +
+					AMOUNT_PER_PERIODIC_PAYMENT * (payment_instance_counter);
 				assert_eq!(<Test as Config>::NativeBalance::balance(&ALICE), expected_balance);
 			}
 
@@ -545,9 +545,9 @@ fn periodic_payout_complex_case() {
 
 			assert_eq!(
 				<Test as Config>::NativeBalance::balance(&ALICE),
-				ALICE_INITIAL_BALANCE + PROPOSAL_AMOUNT
-					- AFTER_FULLY_COMPLETE_AMOUNT
-					- AMOUNT_PER_PERIODIC_PAYMENT
+				ALICE_INITIAL_BALANCE + PROPOSAL_AMOUNT -
+					AFTER_FULLY_COMPLETE_AMOUNT -
+					AMOUNT_PER_PERIODIC_PAYMENT
 			);
 
 			// Check Treasury balance

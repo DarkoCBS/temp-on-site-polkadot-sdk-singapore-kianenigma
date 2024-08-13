@@ -11,10 +11,11 @@ mod tests;
 #[cfg(feature = "runtime-benchmarks")]
 mod benchmarking;
 
-use codec::{Codec, Decode, Encode, HasCompact, MaxEncodedLen};
-use frame_support::pallet_prelude::ConstU32;
-use frame_support::pallet_prelude::TypeInfo;
-use frame_support::BoundedVec;
+use codec::{Decode, Encode, MaxEncodedLen};
+use frame_support::{
+	pallet_prelude::{ConstU32, TypeInfo},
+	BoundedVec,
+};
 
 #[derive(TypeInfo, Encode, Decode, MaxEncodedLen, Debug, Clone, PartialEq)]
 pub enum NumOfPeriodicPayouts {
@@ -74,18 +75,16 @@ pub struct SpendingProposal<T: Config> {
 pub mod pallet {
 	use super::*;
 	use crate::AssetPriceLookup;
-	use frame_support::sp_runtime::traits::AccountIdConversion;
-	use frame_support::traits::fungible::MutateHold;
-	use frame_support::traits::tokens::{Fortitude, Precision, Preservation};
-	use frame_support::PalletId;
 	use frame_support::{
 		pallet_prelude::*,
+		sp_runtime::traits::AccountIdConversion,
 		traits::{
-			fungible::{self, Mutate as FungibleMutate},
+			fungible::{self, Mutate as FungibleMutate, MutateHold},
 			fungibles::{self, Mutate as FungiblesMutate},
+			tokens::{Fortitude, Precision, Preservation},
 			EnsureOrigin,
 		},
-		Twox64Concat,
+		PalletId, Twox64Concat,
 	};
 	use frame_system::pallet_prelude::{OriginFor, *};
 	use sp_runtime::Percent;
@@ -471,7 +470,7 @@ pub mod pallet {
 						PayoutInstances::append(block_number, payout_instance);
 					}
 				},
-				PayoutType::Instant => {
+				PayoutType::Instant =>
 					if proposal.asset_id == T::NATIVE_ASSET_ID {
 						Self::send_native_funds_to_beneficiary(
 							&proposal.beneficiary,
@@ -483,8 +482,7 @@ pub mod pallet {
 							proposal.amount,
 							&proposal.asset_id,
 						)?;
-					}
-				},
+					},
 			}
 
 			Ok(())
