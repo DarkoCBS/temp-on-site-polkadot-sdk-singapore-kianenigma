@@ -8,6 +8,7 @@ use frame::{
 			runtime,
 			traits::AsEnsureOriginWithArg,
 			weights::FixedFee,
+			PalletId
 		},
 	},
 	prelude::*,
@@ -18,10 +19,11 @@ use frame::{
 		},
 		prelude::*,
 	},
-	traits::{FindAuthor, One},
+	traits::{FindAuthor, One, AccountIdConversion},
 };
 use pallet_transaction_payment::{ConstFeeMultiplier, FeeDetails, Multiplier, RuntimeDispatchInfo};
 use sp_runtime::traits::Convert;
+use pallet_treasury::AssetIdOf;
 
 #[runtime_version]
 const VERSION: RuntimeVersion = RuntimeVersion {
@@ -299,6 +301,10 @@ impl pallet_treasury::AssetPriceLookup<Runtime> for SimplePriceLookup {
 		// you can write more clever function here for more accurate testing
 		amt_a
 	}
+
+	fn usd_price(asset_id: &pallet_treasury::AssetIdOf<Runtime>, amount: pallet_treasury::AssetBalanceOf<Runtime>) -> pallet_treasury::AssetBalanceOf<Runtime> {
+		amount
+	}
 }
 
 pub struct SmallSpenderCheck;
@@ -310,6 +316,19 @@ impl EnsureOrigin<RuntimeOrigin> for SmallSpenderCheck {
 			r => Err(RuntimeOrigin::from(r)),
 		})
 	}
+
+	fn try_successful_origin() -> Result<RuntimeOrigin, ()> { todo!() }
+}
+
+parameter_types! {
+	pub const SmallSpenderThreshold: Balance = 5000;
+	pub const MediumSpenderThreshold: Balance = 20000;
+	pub const GovernancePalletId: PalletId = PalletId(*b"test/gov");
+	pub const AmountHeldOnProposal: Balance = 100;
+}
+
+ord_parameter_types! {
+	pub const GovernanceOrigin: AccountId = AccountIdConversion::<AccountId>::into_account_truncating(&GovernancePalletId::get());
 }
 
 /// Configure the pallet-treasury in pallets/treasury.
@@ -317,9 +336,13 @@ impl pallet_treasury::Config for Runtime {
 	type RuntimeEvent = RuntimeEvent;
 	type NativeBalance = Balances;
 	type Fungibles = Assets;
-	type CustomOrigin = EnsureRoot<AccountId>;
+	type GovernanceOrigin = EnsureSignedBy<GovernanceOrigin, AccountId>;
 	type AssetPriceLookup = SimplePriceLookup;
-	type SmallSpender = SmallSpenderCheck;
+	const NATIVE_ASSET_ID: AssetIdOf<Self> = 0;
+	type SmallSpenderThreshold = SmallSpenderThreshold;
+	type MediumSpenderThreshold = MediumSpenderThreshold;
+	type RuntimeHoldReason = RuntimeHoldReason;
+	type AmountHeldOnProposal = AmountHeldOnProposal;
 }
 
 /// The signed extensions that are added to the runtime.

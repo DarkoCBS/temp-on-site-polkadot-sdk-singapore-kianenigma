@@ -6,7 +6,7 @@ use frame_support::{
 };
 use frame_system::{EnsureRoot, EnsureSigned, EnsureSignedBy};
 use sp_core::H256;
-use sp_runtime::traits::{AccountIdConversion, BlakeTwo256, IdentityLookup};
+use sp_runtime::{traits::{AccountIdConversion, BlakeTwo256, IdentityLookup}, BuildStorage};
 
 type Block = frame_system::mocking::MockBlock<Test>;
 pub type Balance = u128;
@@ -132,11 +132,12 @@ impl pallet_treasury::Config for Test {
 	type MediumSpenderThreshold = MediumSpenderThreshold;
 	type RuntimeHoldReason = RuntimeHoldReason;
 	type AmountHeldOnProposal = AmountHeldOnProposal;
+	type BenchmarkHelper = ();
 }
 
-// pub fn new_test_ext() -> sp_io::TestExternalities {
-// 	// learn how to improve your test setup:
-// 	// https://paritytech.github.io/polkadot-sdk/master/polkadot_sdk_docs/guides/your_first_pallet/index.html
-// 	// frame_system::GenesisConfig::<Test>::default().build_storage().unwrap().into()
-// 	RuntimeGenesisConfig::default().build_storage().unwrap().into()
-// }
+pub fn new_test_ext() -> sp_io::TestExternalities {
+	// learn how to improve your test setup:
+	// https://paritytech.github.io/polkadot-sdk/master/polkadot_sdk_docs/guides/your_first_pallet/index.html
+	// frame_system::GenesisConfig::<Test>::default().build_storage().unwrap().into()
+	RuntimeGenesisConfig::default().build_storage().unwrap().into()
+}

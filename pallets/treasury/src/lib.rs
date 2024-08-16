@@ -11,11 +11,14 @@ mod tests;
 #[cfg(feature = "runtime-benchmarks")]
 mod benchmarking;
 
+#[cfg(feature = "runtime-benchmarks")]
+pub use benchmarking::BenchmarkHelper;
 use codec::{Decode, Encode, MaxEncodedLen};
 use frame_support::{
 	pallet_prelude::{ConstU32, TypeInfo},
 	BoundedVec,
 };
+use sp_std::vec::Vec;
 
 #[derive(TypeInfo, Encode, Decode, MaxEncodedLen, Debug, Clone, PartialEq)]
 pub enum NumOfPeriodicPayouts {
@@ -148,6 +151,10 @@ pub mod pallet {
 		type MediumSpenderThreshold: Get<BalanceOf<Self>>;
 		#[pallet::constant]
 		type AmountHeldOnProposal: Get<BalanceOf<Self>>;
+
+		/// The benchmarks need a way to create asset ids from u32s.
+		#[cfg(feature = "runtime-benchmarks")]
+		type BenchmarkHelper: BenchmarkHelper<AssetIdOf<Self>>;
 	}
 
 	#[pallet::pallet]
